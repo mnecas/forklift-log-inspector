@@ -244,3 +244,36 @@ body {
 [class*="animate-spin"] {
   transition-property: transform !important;
 }
+
+/* JSON Syntax Highlighting */
+.json-key {
+  color: #2563eb; /* blue-600 */
+}
+
+.json-string {
+  color: #16a34a; /* green-600 */
+}
+
+.json-number {
+  color: #ea580c; /* orange-600 */
+}
+
+.json-boolean {
+  color: #9333ea; /* purple-600 */
+}
+
+.dark .json-key {
+  color: #60a5fa; /* blue-400 */
+}
+
+.dark .json-string {
+  color: #4ade80; /* green-400 */
+}
+
+.dark .json-number {
+  color: #fb923c; /* orange-400 */
+}
+
+.dark .json-boolean {
+  color: #c084fc; /* purple-400 */
+}

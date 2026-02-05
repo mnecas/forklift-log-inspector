@@ -9,7 +9,7 @@ interface JsonViewerProps {
  * Render formatted JSON with syntax highlighting
  */
 export function JsonViewer({ json, className = '' }: JsonViewerProps) {
-  const highlighted = useMemo(() => {
+  const highlightedHtml = useMemo(() => {
     let formatted: string;
     try {
       const parsed = JSON.parse(json);
@@ -18,48 +18,49 @@ export function JsonViewer({ json, className = '' }: JsonViewerProps) {
       formatted = json;
     }
 
-    return formatted.split('\n').map((line, idx) => {
-      // Highlight keys
-      const keyMatch = line.match(/^(\s*)"([^"]+)":/);
-      if (keyMatch) {
-        const [, indent, key] = keyMatch;
-        const rest = line.slice(keyMatch[0].length);
-        return (
-          <div key={idx}>
-            <span>{indent}</span>
-            <span className="text-blue-600 dark:text-blue-400">"{key}"</span>
-            <span className="text-slate-600 dark:text-slate-400">:</span>
-            <JsonValue value={rest} />
-          </div>
-        );
+    // Apply syntax highlighting via regex replacements
+    // Escape HTML first
+    let html = formatted
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Highlight strings (including keys)
+    html = html.replace(
+      /"([^"\\]|\\.)*"/g,
+      (match) => {
+        // Check if this is a key (followed by :)
+        return `<span class="json-string">${match}</span>`;
       }
-      return <div key={idx} className="text-slate-700 dark:text-slate-300">{line}</div>;
-    });
+    );
+
+    // Highlight numbers
+    html = html.replace(
+      /\b(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g,
+      '<span class="json-number">$1</span>'
+    );
+
+    // Highlight booleans and null
+    html = html.replace(
+      /\b(true|false|null)\b/g,
+      '<span class="json-boolean">$1</span>'
+    );
+
+    // Highlight keys (strings followed by :)
+    html = html.replace(
+      /<span class="json-string">("([^"\\]|\\.)*")<\/span>(\s*):/g,
+      '<span class="json-key">$1</span>$3:'
+    );
+
+    return html;
   }, [json]);
 
-  return <div className={`text-xs font-mono ${className}`}>{highlighted}</div>;
-}
-
-/**
- * Render a JSON value with appropriate color
- */
-function JsonValue({ value }: { value: string }) {
-  const trimmed = value.trim();
-  
-  // String value
-  if (trimmed.startsWith('"')) {
-    return <span className="text-green-600 dark:text-green-400">{value}</span>;
-  }
-  // Number
-  if (/^\s*-?\d/.test(trimmed)) {
-    return <span className="text-orange-600 dark:text-orange-400">{value}</span>;
-  }
-  // Boolean or null
-  if (/^\s*(true|false|null)/.test(trimmed)) {
-    return <span className="text-purple-600 dark:text-purple-400">{value}</span>;
-  }
-  // Object/Array brackets
-  return <span className="text-slate-600 dark:text-slate-400">{value}</span>;
+  return (
+    <pre 
+      className={`text-xs font-mono whitespace-pre-wrap break-words text-slate-700 dark:text-slate-300 ${className}`}
+      dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+    />
+  );
 }
 
 /**
