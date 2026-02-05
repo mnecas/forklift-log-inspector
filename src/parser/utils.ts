@@ -39,16 +39,22 @@ export function parseVMInfo(vmStr: string): { id: string; name: string } {
 }
 
 /**
- * Get VM info from log entry (either from vmRef or vm string)
+ * Get VM info from log entry (either from vmRef or vm string/object)
  */
 export function getVMInfo(entry: LogEntry): { id: string; name: string } {
   // Try VMRef first (structured format)
   if (entry.vmRef?.id) {
     return { id: entry.vmRef.id, name: entry.vmRef.name || '' };
   }
-  // Fall back to VM string format
+  // Check if vm field exists
   if (entry.vm) {
-    return parseVMInfo(entry.vm);
+    // Handle vm as string format: "id:vm-1002 name:'ameen-RHEL9'"
+    if (typeof entry.vm === 'string') {
+      return parseVMInfo(entry.vm);
+    }
+    // Handle vm as object: { id?: string; name?: string }
+    const vmObj = entry.vm as { id?: string; name?: string };
+    return { id: vmObj.id || '', name: vmObj.name || '' };
   }
   return { id: '', name: '' };
 }
