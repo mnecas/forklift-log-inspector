@@ -182,6 +182,7 @@ export function VMCard({ vm }: VMCardProps) {
           logs={selectedPhaseLogs}
           summary={phaseSummaries[selectedPhase]}
           iterations={selectedPhaseIterations}
+          warmInfo={selectedPhase === 'DiskTransfer' ? vm.warmInfo : undefined}
           onClose={() => setSelectedPhase(null)}
         />
       )}

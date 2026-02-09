@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, DragEvent, ChangeEvent } from 'react';
 import { useStore } from '../store/useStore';
 import { useToast } from './Toast';
-import { parseLogFile } from '../parser';
+import { parseLogFile, parsePlanYaml, isYamlContent } from '../parser';
 
 export function UploadZone() {
   const [isDragging, setIsDragging] = useState(false);
@@ -13,7 +13,7 @@ export function UploadZone() {
 
   const handleFile = useCallback(async (file: File) => {
     // Validate file type
-    const validExtensions = ['.log', '.txt', '.json'];
+    const validExtensions = ['.log', '.txt', '.json', '.yaml', '.yml'];
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
     if (!validExtensions.includes(ext)) {
       showToast(`Invalid file type. Allowed: ${validExtensions.join(', ')}`, 'error');
@@ -28,11 +28,16 @@ export function UploadZone() {
       }
 
       const content = await file.text();
-      const result = parseLogFile(content);
+      const isYaml = ext === '.yaml' || ext === '.yml' || isYamlContent(content);
+
+      const result = isYaml ? parsePlanYaml(content) : parseLogFile(content);
       setParseResult(result);
 
+      const fileType = isYaml ? 'Plan YAML' : 'log';
       showToast(
-        `Parsed ${result.stats.parsedLines.toLocaleString()} lines, found ${result.stats.plansFound} plans`,
+        isYaml
+          ? `Parsed ${fileType}: found ${result.stats.plansFound} plan${result.stats.plansFound !== 1 ? 's' : ''}, ${result.stats.vmsFound} VM${result.stats.vmsFound !== 1 ? 's' : ''}`
+          : `Parsed ${result.stats.parsedLines.toLocaleString()} lines, found ${result.stats.plansFound} plans`,
         'success'
       );
     } catch (error) {
@@ -99,7 +104,7 @@ export function UploadZone() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".log,.txt,.json"
+          accept=".log,.txt,.json,.yaml,.yml"
           onChange={handleFileInputChange}
           className="hidden"
         />
@@ -125,10 +130,10 @@ export function UploadZone() {
               />
             </svg>
             <p className="text-slate-900 dark:text-gray-100 font-medium mb-1">
-              Drop your log file here or click to browse
+              Drop your log file or Plan YAML here, or click to browse
             </p>
             <p className="text-slate-500 dark:text-gray-400 text-sm">
-              Supports .log, .txt, .json files
+              Supports .log, .txt, .json, .yaml, .yml files
             </p>
           </>
         )}

@@ -72,6 +72,24 @@ export interface PhaseIteration {
   durationMs?: number;
 }
 
+// Structured precopy data from Plan YAML
+export interface PrecopyInfo {
+  iteration: number;
+  snapshot: string;
+  startedAt?: Date;
+  endedAt?: Date;
+  durationMs?: number;
+  disks: string[];
+}
+
+export interface WarmInfo {
+  precopies: PrecopyInfo[];
+  successes: number;
+  failures: number;
+  consecutiveFailures: number;
+  nextPrecopyAt?: string;
+}
+
 export interface VM {
   id: string;
   name: string;
@@ -85,6 +103,9 @@ export interface VM {
   phaseLogSummaries?: Record<string, PhaseLogSummary>;
   firstSeen: Date;
   lastSeen: Date;
+  fromYaml?: boolean; // True when parsed from Plan YAML (only show actual pipeline steps)
+  precopyCount?: number; // Number of precopy iterations (warm migration from YAML)
+  warmInfo?: WarmInfo; // Structured warm migration precopy data
 }
 
 export interface ErrorEntry {

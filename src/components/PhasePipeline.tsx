@@ -17,12 +17,40 @@ const MIN_WIDTH = 65;
 const MAX_WIDTH = 160;
 
 export function PhasePipeline({ vm, phaseSummaries, onPhaseClick }: PhasePipelineProps) {
-  const knownPhases = getPhasesForMigrationType(vm.migrationType);
+  const knownPhases = vm.fromYaml ? [] : getPhasesForMigrationType(vm.migrationType);
   const knownPhasesSet = new Set(knownPhases);
   
   // Build final phase list with unknown phases inserted at the correct position
   // based on where they appeared in the phaseHistory relative to known phases.
   const phases = useMemo(() => {
+    // For YAML-sourced VMs, just use the phases from history in order (no predefined template)
+    if (vm.fromYaml) {
+      const seen = new Set<string>();
+      const result: string[] = [];
+      for (const ph of vm.phaseHistory || []) {
+        if (!seen.has(ph.name)) {
+          seen.add(ph.name);
+          result.push(ph.name);
+        }
+      }
+      // Also include phases that only appear in logs/summaries
+      if (vm.phaseLogs) {
+        for (const phase of Object.keys(vm.phaseLogs)) {
+          if (!seen.has(phase)) {
+            seen.add(phase);
+            result.push(phase);
+          }
+        }
+      }
+      for (const phase of Object.keys(phaseSummaries)) {
+        if (!seen.has(phase)) {
+          seen.add(phase);
+          result.push(phase);
+        }
+      }
+      return result;
+    }
+
     // Collect all unknown phases and figure out where each one appeared
     const unknownPhasesSet = new Set<string>();
 
@@ -333,6 +361,8 @@ export function PhasePipeline({ vm, phaseSummaries, onPhaseClick }: PhasePipelin
             status = 'error';
           } else if (isLoopPhase && iterationCount > 1) {
             status = 'loop';
+          } else if (phase === 'DiskTransfer' && vm.precopyCount && vm.precopyCount > 1) {
+            status = 'loop'; // Show DiskTransfer with precopies in cyan
           } else {
             status = 'completed';
           }
@@ -391,6 +421,15 @@ export function PhasePipeline({ vm, phaseSummaries, onPhaseClick }: PhasePipelin
                   <div className="absolute -top-2.5 -left-1.5 z-10">
                     <span className="min-w-[20px] h-[20px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center bg-cyan-500 text-white shadow-sm" title={`${iterationCount} iterations`}>
                       ×{iterationCount}
+                    </span>
+                  </div>
+                )}
+
+                {/* Precopy count badge for YAML DiskTransfer */}
+                {vm.precopyCount && vm.precopyCount > 0 && phase === 'DiskTransfer' && (
+                  <div className="absolute -top-2.5 -left-1.5 z-10">
+                    <span className="min-w-[20px] h-[20px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center bg-cyan-500 text-white shadow-sm" title={`${vm.precopyCount} precopies`}>
+                      ×{vm.precopyCount}
                     </span>
                   </div>
                 )}
@@ -477,7 +516,15 @@ function getShortPhaseName(phase: string): string {
     'WaitForInitialSnapshot': 'WaitInit',
     'StoreInitialSnapshot': 'StoreDeltas',
     'Preflight': 'Preflight',
+    'PreflightInspection': 'Preflight',
     'CreateVM': 'CreateVM',
+    'Initialize': 'Init',
+    'DiskTransfer': 'DiskTransfer',
+    'DiskTransferV2v': 'DiskV2V',
+    'DiskAllocation': 'DiskAlloc',
+    'Cutover': 'Cutover',
+    'ImageConversion': 'ImgConv',
+    'VirtualMachineCreation': 'CreateVM',
     'CopyDisks': 'Copy',
     'CopyDisksVirtV2V': 'CopyV2V',
     'CreateGuestConversionPod': 'ConvPod',

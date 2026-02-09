@@ -6,7 +6,7 @@ interface ModalProps {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
-  maxWidth?: 'md' | 'lg' | 'xl' | '2xl' | '4xl' | '6xl';
+  maxWidth?: 'md' | 'lg' | 'xl' | '2xl' | '4xl' | '5xl' | '6xl';
   footer?: React.ReactNode;
 }
 
@@ -16,6 +16,7 @@ const maxWidthClasses = {
   xl: 'max-w-xl',
   '2xl': 'max-w-2xl',
   '4xl': 'max-w-4xl',
+  '5xl': 'max-w-5xl',
   '6xl': 'max-w-6xl',
 };
 
