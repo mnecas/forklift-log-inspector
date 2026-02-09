@@ -283,7 +283,7 @@ export function PhasePipeline({ vm, phaseSummaries, onPhaseClick }: PhasePipelin
               {/* Loop start indicator */}
               {isFirstLoop && didRun && maxPrecopyIterations > 1 && (
                 <div className="flex items-center mr-0.5">
-                  <div className="text-cyan-500 dark:text-cyan-400 text-lg font-bold" title="Precopy loop start">⟳</div>
+                  <div className="text-cyan-500 dark:text-cyan-400 text-base font-bold" title="Precopy loop start">⟳</div>
                 </div>
               )}
               
@@ -372,7 +372,7 @@ export function PhasePipeline({ vm, phaseSummaries, onPhaseClick }: PhasePipelin
               {/* Loop end indicator with back arrow */}
               {isLastLoop && didRun && maxPrecopyIterations > 1 && (
                 <div className="flex items-center ml-0.5">
-                  <div className="text-cyan-500 dark:text-cyan-400 text-xs font-medium" title="Loop back to CopyDisks">↺</div>
+                  <div className="text-cyan-500 dark:text-cyan-400 text-base font-bold" title="Loop back to CopyDisks">↺</div>
                 </div>
               )}
 
