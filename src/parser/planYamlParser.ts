@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import type { Plan, VM, VMError, PhaseInfo, Condition, ParsedData, ParseStats, Summary, PhaseLogSummary, RawLogEntry, MigrationType, WarmInfo, PrecopyInfo } from '../types';
+import type { Plan, PlanSpec, VM, VMError, PhaseInfo, Condition, ParsedData, ParseStats, Summary, PhaseLogSummary, RawLogEntry, MigrationType, WarmInfo, PrecopyInfo } from '../types';
 import { PlanStatuses, MigrationTypes, PipelineSteps, phaseToStep } from './constants';
 import { formatDuration, groupLogs } from './utils';
 
@@ -14,11 +14,32 @@ interface YamlPlanResource {
     uid?: string;
   };
   spec?: {
+    description?: string;
     type?: string;
     warm?: boolean;
     vms?: Array<{ id?: string; name?: string }>;
     targetNamespace?: string;
     archived?: boolean;
+    preserveStaticIPs?: boolean;
+    skipGuestConversion?: boolean;
+    useCompatibilityMode?: boolean;
+    runPreflightInspection?: boolean;
+    targetPowerState?: string;
+    migrateSharedDisks?: boolean;
+    pvcNameTemplateUseGenerateName?: boolean;
+    preserveClusterCpuModel?: boolean;
+    deleteGuestConversionPod?: boolean;
+    deleteVmOnFailMigration?: boolean;
+    installLegacyDrivers?: boolean;
+    transferNetwork?: { name?: string; namespace?: string };
+    provider?: {
+      source?: { name?: string };
+      destination?: { name?: string };
+    };
+    map?: {
+      network?: { name?: string };
+      storage?: { name?: string };
+    };
   };
   status?: {
     conditions?: YamlCondition[];
@@ -81,6 +102,7 @@ interface YamlPrecopy {
 interface YamlVMStatus {
   id?: string;
   name?: string;
+  newName?: string;
   phase?: string;
   started?: string;
   completed?: string;
@@ -231,6 +253,28 @@ function convertPlanResource(resource: YamlPlanResource): Plan {
   const migStarted = resource.status?.migration?.started;
   const migCompleted = resource.status?.migration?.completed;
 
+  // Build plan spec info
+  const spec: PlanSpec | undefined = resource.spec ? {
+    description: resource.spec.description,
+    targetNamespace: resource.spec.targetNamespace,
+    preserveStaticIPs: resource.spec.preserveStaticIPs,
+    skipGuestConversion: resource.spec.skipGuestConversion,
+    useCompatibilityMode: resource.spec.useCompatibilityMode,
+    runPreflightInspection: resource.spec.runPreflightInspection,
+    targetPowerState: resource.spec.targetPowerState,
+    migrateSharedDisks: resource.spec.migrateSharedDisks,
+    pvcNameTemplateUseGenerateName: resource.spec.pvcNameTemplateUseGenerateName,
+    preserveClusterCPUModel: resource.spec.preserveClusterCpuModel,
+    deleteGuestConversionPod: resource.spec.deleteGuestConversionPod,
+    deleteVmOnFailMigration: resource.spec.deleteVmOnFailMigration,
+    installLegacyDrivers: resource.spec.installLegacyDrivers,
+    transferNetwork: resource.spec.transferNetwork?.name,
+    sourceProvider: resource.spec.provider?.source?.name,
+    destinationProvider: resource.spec.provider?.destination?.name,
+    networkMap: resource.spec.map?.network?.name,
+    storageMap: resource.spec.map?.storage?.name,
+  } : undefined;
+
   return {
     name,
     namespace,
@@ -242,6 +286,7 @@ function convertPlanResource(resource: YamlPlanResource): Plan {
     panics: [],
     firstSeen: new Date(migStarted || resource.metadata?.creationTimestamp || 0),
     lastSeen: new Date(migCompleted || migStarted || resource.metadata?.creationTimestamp || 0),
+    spec,
   };
 }
 
@@ -449,6 +494,9 @@ function convertVMStatus(yamlVM: YamlVMStatus, planMigrationType: MigrationType)
     warmInfo,
     error: vmError,
     conditions: vmConditions.length > 0 ? vmConditions : undefined,
+    operatingSystem: yamlVM.operatingSystem,
+    restorePowerState: yamlVM.restorePowerState,
+    newName: yamlVM.newName && yamlVM.newName !== name ? yamlVM.newName : undefined,
   };
 }
 

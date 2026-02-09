@@ -113,6 +113,9 @@ export interface VM {
   warmInfo?: WarmInfo; // Structured warm migration precopy data
   error?: VMError; // VM-level error (from YAML status)
   conditions?: Condition[]; // VM-level conditions (from YAML status)
+  operatingSystem?: string; // Guest OS (from YAML status)
+  restorePowerState?: string; // Power state to restore after migration
+  newName?: string; // DNS-compliant renamed name (if different from original)
 }
 
 // Cycle view: logs from all phases grouped by cycle/iteration
@@ -155,6 +158,27 @@ export interface PanicEntry {
   count: number;
 }
 
+export interface PlanSpec {
+  description?: string;
+  targetNamespace?: string;
+  preserveStaticIPs?: boolean;
+  skipGuestConversion?: boolean;
+  useCompatibilityMode?: boolean;
+  runPreflightInspection?: boolean;
+  targetPowerState?: string;
+  migrateSharedDisks?: boolean;
+  pvcNameTemplateUseGenerateName?: boolean;
+  preserveClusterCPUModel?: boolean;
+  deleteGuestConversionPod?: boolean;
+  deleteVmOnFailMigration?: boolean;
+  installLegacyDrivers?: boolean;
+  transferNetwork?: string;
+  sourceProvider?: string;
+  destinationProvider?: string;
+  networkMap?: string;
+  storageMap?: string;
+}
+
 export interface Plan {
   name: string;
   namespace: string;
@@ -167,6 +191,7 @@ export interface Plan {
   panics: PanicEntry[];
   firstSeen: Date;
   lastSeen: Date;
+  spec?: PlanSpec;
 }
 
 export interface Event {

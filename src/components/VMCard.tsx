@@ -171,6 +171,22 @@ export function VMCard({ vm }: VMCardProps) {
           <div className="text-slate-500 dark:text-gray-400">
             <span className="font-medium">Step:</span> {vm.currentStep || 'N/A'}
           </div>
+          {vm.operatingSystem && (
+            <div className="text-slate-500 dark:text-gray-400">
+              <span className="font-medium">OS:</span> {vm.operatingSystem}
+            </div>
+          )}
+          {vm.restorePowerState && (
+            <div className="text-slate-500 dark:text-gray-400">
+              <span className="font-medium">Power State:</span> {vm.restorePowerState}
+            </div>
+          )}
+          {vm.newName && (
+            <div className="text-slate-500 dark:text-gray-400">
+              <span className="font-medium">Renamed to:</span>{' '}
+              <span className="text-blue-600 dark:text-blue-400">{vm.newName}</span>
+            </div>
+          )}
         </div>
 
         {/* Data Volumes */}

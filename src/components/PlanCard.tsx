@@ -108,6 +108,48 @@ export function PlanCard({ plan }: PlanCardProps) {
             </div>
           </div>
 
+          {/* Plan Settings (YAML spec) */}
+          {plan.spec && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-500 dark:text-gray-400">Plan Settings</h4>
+              {plan.spec.description && (
+                <p className="text-sm text-slate-600 dark:text-gray-300 italic">{plan.spec.description}</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {plan.spec.targetNamespace && (
+                  <SpecPill label="Target NS" value={plan.spec.targetNamespace} />
+                )}
+                {plan.spec.sourceProvider && (
+                  <SpecPill label="Source" value={plan.spec.sourceProvider} />
+                )}
+                {plan.spec.destinationProvider && (
+                  <SpecPill label="Destination" value={plan.spec.destinationProvider} />
+                )}
+                {plan.spec.networkMap && (
+                  <SpecPill label="Network Map" value={plan.spec.networkMap} />
+                )}
+                {plan.spec.storageMap && (
+                  <SpecPill label="Storage Map" value={plan.spec.storageMap} />
+                )}
+                {plan.spec.transferNetwork && (
+                  <SpecPill label="Transfer Network" value={plan.spec.transferNetwork} />
+                )}
+                {plan.spec.targetPowerState && (
+                  <SpecPill label="Power State" value={plan.spec.targetPowerState} />
+                )}
+                <BoolPill label="Preflight Inspection" value={plan.spec.runPreflightInspection} />
+                <BoolPill label="Compatibility Mode" value={plan.spec.useCompatibilityMode} />
+                <BoolPill label="Preserve Static IPs" value={plan.spec.preserveStaticIPs} />
+                <BoolPill label="Preserve Cluster CPU" value={plan.spec.preserveClusterCPUModel} />
+                <BoolPill label="Skip Guest Conversion" value={plan.spec.skipGuestConversion} />
+                <BoolPill label="Shared Disks" value={plan.spec.migrateSharedDisks} />
+                <BoolPill label="Delete Conversion Pod" value={plan.spec.deleteGuestConversionPod} />
+                <BoolPill label="Delete VM on Failure" value={plan.spec.deleteVmOnFailMigration} />
+                <BoolPill label="Legacy Drivers" value={plan.spec.installLegacyDrivers} />
+              </div>
+            </div>
+          )}
+
           {/* Conditions */}
           {plan.conditions.length > 0 && (
             <div className="space-y-2">
@@ -159,5 +201,32 @@ export function PlanCard({ plan }: PlanCardProps) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Spec display helpers ──────────────────────────────────────────────
+
+function SpecPill({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-gray-300">
+      <span className="font-medium text-slate-500 dark:text-gray-400">{label}:</span>
+      {value}
+    </span>
+  );
+}
+
+function BoolPill({ label, value }: { label: string; value?: boolean }) {
+  if (value === undefined) return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${
+        value
+          ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-gray-400'
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${value ? 'bg-green-500' : 'bg-slate-400 dark:bg-gray-500'}`} />
+      {label}
+    </span>
   );
 }
