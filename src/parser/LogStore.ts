@@ -6,7 +6,7 @@ import type {
   MigrationType,
 } from '../types';
 import { PlanStatuses, MigrationTypes, phaseToStep } from './constants';
-import { computePhaseLogSummaries, detectVMMigrationType } from './utils';
+import { computePhaseLogSummaries, detectVMMigrationType, buildWarmInfoFromPhaseHistory } from './utils';
 
 /**
  * LogStore manages parsed data during log file processing
@@ -123,6 +123,16 @@ export class LogStore {
           vm.currentStep = phaseToStep(vm.currentPhase, isWarm);
         }
         
+        // Build warmInfo from controller log phase history for warm VMs
+        // (YAML-sourced VMs already have warmInfo set)
+        if (isWarm && !vm.warmInfo) {
+          const warmInfo = buildWarmInfoFromPhaseHistory(vm.phaseHistory);
+          if (warmInfo) {
+            vm.warmInfo = warmInfo;
+            vm.precopyCount = warmInfo.precopies.length;
+          }
+        }
+
         // Update step info in phase history
         for (const ph of vm.phaseHistory) {
           ph.step = phaseToStep(ph.name, isWarm);

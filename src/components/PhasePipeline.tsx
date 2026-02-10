@@ -345,11 +345,13 @@ export function PhasePipeline({ vm, phaseSummaries, onPhaseClick, onCycleViewCli
                 <span className={`mt-1 text-[10px] font-medium h-4 ${
                   status === 'notRun' 
                     ? 'text-gray-400 dark:text-gray-600' 
-                    : status === 'unknown'
-                      ? 'text-purple-600 dark:text-purple-400'
-                      : status === 'loop'
-                        ? 'text-cyan-600 dark:text-cyan-400'
-                        : 'text-green-600 dark:text-green-400'
+                    : status === 'error'
+                      ? 'text-red-600 dark:text-red-400'
+                      : status === 'unknown'
+                        ? 'text-purple-600 dark:text-purple-400'
+                        : status === 'loop'
+                          ? 'text-cyan-600 dark:text-cyan-400'
+                          : 'text-green-600 dark:text-green-400'
                 }`}>
                   {duration || ''}
                 </span>

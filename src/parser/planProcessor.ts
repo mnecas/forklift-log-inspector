@@ -1,4 +1,4 @@
-import type { LogEntry, Plan, Condition, RawLogEntry } from '../types';
+import type { LogEntry, Plan, Condition, RawLogEntry, WarmInfo, PrecopyInfo } from '../types';
 import { LogStore } from './LogStore';
 import { PlanStatuses, Phases, ConditionStatus, PrecopyLoopPhasesSet, PrecopyLoopStartPhase } from './constants';
 import { getVMInfo, truncate, getStringFromMap } from './utils';
@@ -109,6 +109,13 @@ export function processPlanLog(store: LogStore, entry: LogEntry, ts: Date): void
   // Check for migration run with phase
   if (msg === 'Migration [RUN]' && vmID) {
     processVMPhase(store, plan, entry, ts);
+    storeVMLog(plan, entry);
+    return;
+  }
+
+  // Check for SetCheckpoint (warm migration precopy data)
+  if (msg === 'SetCheckpoint' && vmID) {
+    processSetCheckpoint(plan, entry, ts);
     storeVMLog(plan, entry);
     return;
   }
@@ -295,6 +302,76 @@ function processVMPhase(store: LogStore, plan: Plan, entry: LogEntry, ts: Date):
   // Check if completed
   if (entry.phase === Phases.Completed) {
     plan.status = PlanStatuses.Succeeded;
+  }
+}
+
+/**
+ * Process SetCheckpoint log entries to extract warm migration precopy data.
+ * The SetCheckpoint message contains accumulated precopies with snapshot names,
+ * disk deltas, and timing information.
+ */
+function processSetCheckpoint(plan: Plan, entry: LogEntry, _ts: Date): void {
+  const { id: vmID } = getVMInfo(entry);
+  if (!vmID) return;
+
+  const vm = plan.vms[vmID];
+  if (!vm) return;
+
+  // Access extra fields from the SetCheckpoint entry
+  const entryRecord = entry as unknown as Record<string, unknown>;
+  const precopies = entryRecord.precopies as Array<{
+    start?: string;
+    end?: string;
+    snapshot?: string;
+    createTaskId?: string;
+    removeTaskId?: string;
+    deltas?: Array<{ disk?: string; deltaId?: string }>;
+  }> | undefined;
+
+  if (!precopies || precopies.length === 0) return;
+
+  // Build PrecopyInfo from the raw precopies data
+  const precopyInfos: PrecopyInfo[] = precopies.map((p, i) => {
+    const start = p.start ? new Date(p.start) : undefined;
+    const end = p.end ? new Date(p.end) : undefined;
+    const durationMs = start && end ? end.getTime() - start.getTime() : undefined;
+    return {
+      iteration: i + 1,
+      snapshot: p.snapshot || 'unknown',
+      startedAt: start,
+      endedAt: end,
+      durationMs,
+      disks: (p.deltas || []).map(d => d.disk || '').filter(Boolean),
+    };
+  });
+
+  // Count successes (precopies with an end time) and failures
+  const successes = precopyInfos.filter(p => p.endedAt).length;
+  const totalAttempted = precopyInfos.length;
+  const failures = totalAttempted - successes - (precopyInfos.some(p => !p.endedAt) ? 1 : 0); // Don't count in-progress as failure
+
+  // Check if this is the final checkpoint
+  const isFinal = entryRecord.final === true;
+
+  const warmInfo: WarmInfo = {
+    precopies: precopyInfos,
+    successes,
+    failures: failures > 0 ? failures : 0,
+    consecutiveFailures: 0,
+  };
+
+  // Always update warmInfo with the latest SetCheckpoint data (accumulates)
+  vm.warmInfo = warmInfo;
+  vm.precopyCount = precopyInfos.length;
+
+  // Mark as warm migration if not already set
+  if (vm.migrationType === 'Unknown') {
+    vm.migrationType = 'Warm';
+  }
+
+  // Store final checkpoint info for reference
+  if (isFinal) {
+    vm.warmInfo.consecutiveFailures = 0; // Final checkpoint means success
   }
 }
 

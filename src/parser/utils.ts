@@ -1,5 +1,5 @@
-import type { LogEntry, VM, RawLogEntry, GroupedLogEntry, PhaseLogSummary, PhaseInfo } from '../types';
-import { VMRegex, WarmOnlyPhases, ColdDiskPhases, MigrationTypes, Phases } from './constants';
+import type { LogEntry, VM, RawLogEntry, GroupedLogEntry, PhaseLogSummary, PhaseInfo, WarmInfo, PrecopyInfo } from '../types';
+import { VMRegex, WarmOnlyPhases, ColdDiskPhases, MigrationTypes, Phases, PrecopyLoopPhasesSet, PrecopyLoopStartPhase } from './constants';
 
 /**
  * Parse various log timestamp formats
@@ -200,6 +200,94 @@ export function computePhaseLogSummaries(vm: VM): Record<string, PhaseLogSummary
   }
 
   return summaries;
+}
+
+/**
+ * Build WarmInfo from controller log phase history.
+ * Groups precopy loop phases by iteration number and derives timing/summary.
+ */
+export function buildWarmInfoFromPhaseHistory(phaseHistory: PhaseInfo[]): WarmInfo | undefined {
+  // Collect all precopy loop phases that have an iteration number
+  const iterationMap = new Map<number, PhaseInfo[]>();
+  for (const ph of phaseHistory) {
+    if (PrecopyLoopPhasesSet.has(ph.name) && ph.iteration) {
+      const phases = iterationMap.get(ph.iteration) || [];
+      phases.push(ph);
+      iterationMap.set(ph.iteration, phases);
+    }
+  }
+
+  if (iterationMap.size === 0) return undefined;
+
+  const precopies: PrecopyInfo[] = [];
+  let successes = 0;
+  let failures = 0;
+
+  // Sort by iteration number
+  const sortedIterations = Array.from(iterationMap.entries()).sort((a, b) => a[0] - b[0]);
+
+  for (const [iteration, phases] of sortedIterations) {
+    // Find the earliest start and latest end across all phases in this iteration
+    let startedAt: Date | undefined;
+    let endedAt: Date | undefined;
+    let allPhasesCompleted = true;
+
+    for (const ph of phases) {
+      if (ph.startedAt) {
+        if (!startedAt || ph.startedAt < startedAt) {
+          startedAt = ph.startedAt;
+        }
+      }
+      if (ph.endedAt) {
+        if (!endedAt || ph.endedAt > endedAt) {
+          endedAt = ph.endedAt;
+        }
+      } else {
+        allPhasesCompleted = false;
+      }
+    }
+
+    const durationMs = startedAt && endedAt
+      ? endedAt.getTime() - startedAt.getTime()
+      : undefined;
+
+    // Check if this iteration has the final loop phase (AddCheckpoint) completed
+    const hasAddCheckpoint = phases.some(
+      ph => ph.name === Phases.AddCheckpoint && ph.endedAt
+    );
+
+    // Check if the first phase of this iteration started (CopyDisks)
+    const hasCopyDisksStart = phases.some(
+      ph => ph.name === PrecopyLoopStartPhase && ph.startedAt
+    );
+
+    if (hasAddCheckpoint) {
+      successes++;
+    } else if (hasCopyDisksStart && !allPhasesCompleted) {
+      // Iteration started but didn't complete - could be in progress or failed
+      // Only count as failure if there's a subsequent iteration (meaning this one was retried)
+      const hasLaterIteration = sortedIterations.some(([i]) => i > iteration);
+      if (hasLaterIteration) {
+        failures++;
+      }
+    }
+
+    precopies.push({
+      iteration,
+      snapshot: `iteration-${iteration}`,
+      startedAt,
+      endedAt,
+      durationMs,
+      disks: [],
+    });
+  }
+
+  return {
+    precopies,
+    successes,
+    failures,
+    consecutiveFailures: 0,
+  };
 }
 
 /**

@@ -1,9 +1,10 @@
 import { useCallback, useState, useMemo } from 'react';
-import type { VM, RawLogEntry, GroupedLogEntry, CycleData, CyclePhaseData } from '../types';
+import type { VM, RawLogEntry, GroupedLogEntry, CycleData, CyclePhaseData, WarmInfo } from '../types';
 import { formatDateTime } from '../utils/dateUtils';
 import { Modal, LogGroupCard, LogFilterBar } from './common';
 import { formatDuration } from '../parser/utils';
-import { PrecopyLoopPhases, PrecopyLoopPhasesSet } from '../parser/constants';
+import { PrecopyLoopPhases, PrecopyLoopPhasesSet, Phases } from '../parser/constants';
+import { PrecopyOverview } from './PrecopyOverview';
 
 interface CycleLogsModalProps {
   vm: VM;
@@ -143,6 +144,47 @@ export function CycleLogsModal({ vm, onClose }: CycleLogsModalProps) {
   const totalLogs = cycles.reduce((sum, c) => sum + c.totalLogs, 0);
   const cycleCount = cycles.length;
 
+  // Build warmInfo: prefer vm.warmInfo (from SetCheckpoint logs / YAML),
+  // fall back to deriving it from the computed cycles data
+  const warmInfo = useMemo((): WarmInfo | undefined => {
+    if (vm.warmInfo && vm.warmInfo.precopies.length > 0) {
+      return vm.warmInfo;
+    }
+    // Build from cycles data
+    if (cycles.length === 0) return undefined;
+
+    const precopies = cycles.map(cycle => {
+      // Check if the cycle completed (has AddCheckpoint with endedAt)
+      const hasCompleted = cycle.phases.some(
+        p => p.phase === Phases.AddCheckpoint && p.endedAt
+      );
+      return {
+        iteration: cycle.iteration,
+        snapshot: `iteration-${cycle.iteration}`,
+        startedAt: cycle.startedAt,
+        endedAt: cycle.endedAt,
+        durationMs: cycle.durationMs,
+        disks: [] as string[],
+        _completed: hasCompleted,
+      };
+    });
+
+    const successes = precopies.filter(p => p._completed).length;
+    // Don't count the last in-progress iteration as a failure
+    const inProgress = precopies.length > 0 && !precopies[precopies.length - 1]._completed ? 1 : 0;
+    const failures = precopies.length - successes - inProgress;
+
+    return {
+      precopies: precopies.map(({ _completed: _, ...rest }) => rest),
+      successes,
+      failures: failures > 0 ? failures : 0,
+      consecutiveFailures: 0,
+    };
+  }, [vm.warmInfo, cycles]);
+
+  const hasWarmInfo = warmInfo != null && warmInfo.precopies.length > 0;
+  const [activeTab, setActiveTab] = useState<'visual' | 'logs'>(cycles.length > 0 ? 'visual' : 'logs');
+
   // Level counts across all cycles
   const levelCounts = useMemo(() => {
     const counts: Record<string, number> = { all: 0, error: 0, warning: 0, info: 0, debug: 0 };
@@ -204,177 +246,226 @@ export function CycleLogsModal({ vm, onClose }: CycleLogsModalProps) {
       isOpen={true}
       onClose={onClose}
       title={`${vm.name} - Precopy Cycles`}
-      subtitle={`${cycleCount} cycle${cycleCount !== 1 ? 's' : ''} across ${PrecopyLoopPhases.length} phases (${totalLogs} total logs)`}
+      subtitle={hasWarmInfo
+        ? `Warm Migration - ${warmInfo!.precopies.length} precopy iteration${warmInfo!.precopies.length !== 1 ? 's' : ''}`
+        : `${cycleCount} cycle${cycleCount !== 1 ? 's' : ''} across ${PrecopyLoopPhases.length} phases (${totalLogs} total logs)`
+      }
       maxWidth="5xl"
     >
-      <LogFilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        levelFilter={levelFilter}
-        onLevelFilterChange={setLevelFilter}
-        levelCounts={levelCounts}
-      />
+      {/* Tab switcher */}
+      {hasWarmInfo && (
+        <div className="px-6 py-2 border-b border-slate-200 dark:border-slate-700 flex gap-1">
+          <button
+            onClick={() => setActiveTab('visual')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'visual'
+                ? 'bg-cyan-500 text-white'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-100'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Precopy Overview
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'logs'
+                ? 'bg-cyan-500 text-white'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-100'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              Raw Logs ({totalLogs})
+            </span>
+          </button>
+        </div>
+      )}
 
-      {/* Cycles list */}
-      <div className="p-4 space-y-4">
-        {cycles.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 dark:text-gray-400">
-            No precopy cycles found
-          </div>
-        ) : (
-          cycles.map(cycle => {
-            const isExpanded = expandedCycles.has(cycle.iteration);
-            const hasMatches = cycleHasMatchingLogs(cycle);
+      {/* Precopy Overview tab */}
+      {hasWarmInfo && activeTab === 'visual' && (
+        <PrecopyOverview warmInfo={warmInfo!} />
+      )}
 
-            if (!hasMatches && (searchQuery.trim() || levelFilter !== 'all')) {
-              return null;
-            }
+      {/* Raw Logs tab */}
+      {(!hasWarmInfo || activeTab === 'logs') && (
+        <>
+          <LogFilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            levelFilter={levelFilter}
+            onLevelFilterChange={setLevelFilter}
+            levelCounts={levelCounts}
+          />
 
-            return (
-              <div
-                key={cycle.iteration}
-                className="border border-cyan-200 dark:border-cyan-800 rounded-lg overflow-hidden"
-              >
-                {/* Cycle header */}
-                <button
-                  onClick={() => toggleCycle(cycle.iteration)}
-                  className="w-full px-4 py-3 bg-cyan-50 dark:bg-cyan-900/30 flex items-center justify-between hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <svg
-                      className={`w-4 h-4 text-cyan-600 dark:text-cyan-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                    <span className="font-semibold text-cyan-700 dark:text-cyan-300">
-                      Cycle {cycle.iteration}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-500 text-white">
-                      {cycle.totalLogs} log{cycle.totalLogs !== 1 ? 's' : ''}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-gray-300">
-                      {cycle.phases.length} phase{cycle.phases.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-gray-400">
-                    {cycle.durationMs && (
-                      <span className="text-cyan-600 dark:text-cyan-400 font-medium">
-                        {formatDuration(cycle.durationMs)}
-                      </span>
-                    )}
-                    <span className="text-xs">
-                      {cycle.startedAt && formatDateTime(cycle.startedAt.toISOString())}
-                      {cycle.endedAt &&
-                        ` - ${formatDateTime(cycle.endedAt.toISOString())}`}
-                    </span>
-                  </div>
-                </button>
-
-                {/* Cycle content - phases */}
-                {isExpanded && (
-                  <div className="p-3 space-y-2 bg-white dark:bg-slate-800">
-                    {cycle.phases.map(phase => {
-                      const phaseKey = `${cycle.iteration}-${phase.phase}`;
-                      const isPhaseExpanded = expandedPhases.has(phaseKey);
-                      const filteredLogs = filterGroupedLogs(phase.groupedLogs);
-                      const phaseLogCount = phase.logs.length;
-
-                      if (
-                        filteredLogs.length === 0 &&
-                        (searchQuery.trim() || levelFilter !== 'all')
-                      ) {
-                        return null;
-                      }
-
-                      return (
-                        <div
-                          key={phaseKey}
-                          className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden"
-                        >
-                          {/* Phase header */}
-                          <button
-                            onClick={() => togglePhase(phaseKey)}
-                            className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <svg
-                                className={`w-3.5 h-3.5 text-slate-500 dark:text-gray-400 transition-transform ${isPhaseExpanded ? 'rotate-90' : ''}`}
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 5l7 7-7 7"
-                                />
-                              </svg>
-                              <span className="font-medium text-sm text-slate-800 dark:text-gray-200">
-                                {phase.phase}
-                              </span>
-                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                                {phaseLogCount} log{phaseLogCount !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400">
-                              {phase.durationMs != null && (
-                                <span className="text-green-600 dark:text-green-400 font-medium">
-                                  {formatDuration(phase.durationMs)}
-                                </span>
-                              )}
-                              {phase.startedAt && (
-                                <span>
-                                  {formatDateTime(phase.startedAt.toISOString())}
-                                  {phase.endedAt &&
-                                    ` - ${formatDateTime(phase.endedAt.toISOString())}`}
-                                </span>
-                              )}
-                            </div>
-                          </button>
-
-                          {/* Phase logs */}
-                          {isPhaseExpanded && (
-                            <div className="border-t border-slate-200 dark:border-slate-700 p-2 space-y-2 bg-slate-50 dark:bg-slate-800/50">
-                              {filteredLogs.length === 0 ? (
-                                <div className="text-center py-3 text-slate-500 dark:text-gray-400 text-sm">
-                                  No logs matching your criteria
-                                </div>
-                              ) : (
-                                filteredLogs.map((group, idx) => (
-                                  <LogGroupCard
-                                    key={`${phaseKey}-${idx}`}
-                                    group={group}
-                                    isExpanded={expandedGroups.has(
-                                      `${phaseKey}-${idx}`
-                                    )}
-                                    onToggle={() =>
-                                      toggleGroup(`${phaseKey}-${idx}`)
-                                    }
-                                    searchQuery={searchQuery}
-                                  />
-                                ))
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+          {/* Cycles list */}
+          <div className="p-4 space-y-4">
+            {cycles.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 dark:text-gray-400">
+                No precopy cycles found
               </div>
-            );
-          })
-        )}
-      </div>
+            ) : (
+              cycles.map(cycle => {
+                const isExpanded = expandedCycles.has(cycle.iteration);
+                const hasMatches = cycleHasMatchingLogs(cycle);
+
+                if (!hasMatches && (searchQuery.trim() || levelFilter !== 'all')) {
+                  return null;
+                }
+
+                return (
+                  <div
+                    key={cycle.iteration}
+                    className="border border-cyan-200 dark:border-cyan-800 rounded-lg overflow-hidden"
+                  >
+                    {/* Cycle header */}
+                    <button
+                      onClick={() => toggleCycle(cycle.iteration)}
+                      className="w-full px-4 py-3 bg-cyan-50 dark:bg-cyan-900/30 flex items-center justify-between hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <svg
+                          className={`w-4 h-4 text-cyan-600 dark:text-cyan-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                        <span className="font-semibold text-cyan-700 dark:text-cyan-300">
+                          Cycle {cycle.iteration}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-500 text-white">
+                          {cycle.totalLogs} log{cycle.totalLogs !== 1 ? 's' : ''}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-gray-300">
+                          {cycle.phases.length} phase{cycle.phases.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-gray-400">
+                        {cycle.durationMs && (
+                          <span className="text-cyan-600 dark:text-cyan-400 font-medium">
+                            {formatDuration(cycle.durationMs)}
+                          </span>
+                        )}
+                        <span className="text-xs">
+                          {cycle.startedAt && formatDateTime(cycle.startedAt.toISOString())}
+                          {cycle.endedAt &&
+                            ` - ${formatDateTime(cycle.endedAt.toISOString())}`}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Cycle content - phases */}
+                    {isExpanded && (
+                      <div className="p-3 space-y-2 bg-white dark:bg-slate-800">
+                        {cycle.phases.map(phase => {
+                          const phaseKey = `${cycle.iteration}-${phase.phase}`;
+                          const isPhaseExpanded = expandedPhases.has(phaseKey);
+                          const filteredLogs = filterGroupedLogs(phase.groupedLogs);
+                          const phaseLogCount = phase.logs.length;
+
+                          if (
+                            filteredLogs.length === 0 &&
+                            (searchQuery.trim() || levelFilter !== 'all')
+                          ) {
+                            return null;
+                          }
+
+                          return (
+                            <div
+                              key={phaseKey}
+                              className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden"
+                            >
+                              {/* Phase header */}
+                              <button
+                                onClick={() => togglePhase(phaseKey)}
+                                className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <svg
+                                    className={`w-3.5 h-3.5 text-slate-500 dark:text-gray-400 transition-transform ${isPhaseExpanded ? 'rotate-90' : ''}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                  <span className="font-medium text-sm text-slate-800 dark:text-gray-200">
+                                    {phase.phase}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                                    {phaseLogCount} log{phaseLogCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400">
+                                  {phase.durationMs != null && (
+                                    <span className="text-green-600 dark:text-green-400 font-medium">
+                                      {formatDuration(phase.durationMs)}
+                                    </span>
+                                  )}
+                                  {phase.startedAt && (
+                                    <span>
+                                      {formatDateTime(phase.startedAt.toISOString())}
+                                      {phase.endedAt &&
+                                        ` - ${formatDateTime(phase.endedAt.toISOString())}`}
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+
+                              {/* Phase logs */}
+                              {isPhaseExpanded && (
+                                <div className="border-t border-slate-200 dark:border-slate-700 p-2 space-y-2 bg-slate-50 dark:bg-slate-800/50">
+                                  {filteredLogs.length === 0 ? (
+                                    <div className="text-center py-3 text-slate-500 dark:text-gray-400 text-sm">
+                                      No logs matching your criteria
+                                    </div>
+                                  ) : (
+                                    filteredLogs.map((group, idx) => (
+                                      <LogGroupCard
+                                        key={`${phaseKey}-${idx}`}
+                                        group={group}
+                                        isExpanded={expandedGroups.has(
+                                          `${phaseKey}-${idx}`
+                                        )}
+                                        onToggle={() =>
+                                          toggleGroup(`${phaseKey}-${idx}`)
+                                        }
+                                        searchQuery={searchQuery}
+                                      />
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
@@ -413,4 +504,3 @@ function groupLogEntries(logs: RawLogEntry[]): GroupedLogEntry[] {
 
   return order.map(k => groups.get(k)!);
 }
-
