@@ -241,6 +241,30 @@ function convertPlanResource(resource: YamlPlanResource): Plan {
   const vms: Record<string, VM> = {};
   const migrationVMs = resource.status?.migration?.vms || [];
 
+  // Infer status from migration / VM data when conditions are absent or inconclusive
+  if (status === PlanStatuses.Pending || status === PlanStatuses.Ready) {
+    const migration = resource.status?.migration;
+
+    if (migrationVMs.length > 0) {
+      // A VM has an error if it has a top-level error OR any pipeline step has an error
+      const hasError = migrationVMs.some(
+        vm => !!vm.error || vm.pipeline?.some(step => !!step.error),
+      );
+      // A VM is complete if it has a completed timestamp OR its phase is "Completed"
+      const allCompleted = migrationVMs.every(
+        vm => !!vm.completed || vm.phase === 'Completed',
+      );
+
+      if (hasError) {
+        status = PlanStatuses.Failed;
+      } else if (migration?.completed || allCompleted) {
+        status = PlanStatuses.Succeeded;
+      } else if (migration?.started) {
+        status = PlanStatuses.Running;
+      }
+    }
+  }
+
   for (const yamlVM of migrationVMs) {
     const vm = convertVMStatus(yamlVM, migrationType);
     if (vm) {

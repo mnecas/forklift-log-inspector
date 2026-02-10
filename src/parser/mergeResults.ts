@@ -100,6 +100,15 @@ function enrichPlan(logPlan: Plan, yamlPlan: Plan): Plan {
     enriched.spec = yamlPlan.spec;
   }
 
+  // If the log-derived status is inconclusive but YAML has a definitive status, use the YAML status
+  if (
+    (enriched.status === 'Pending' || enriched.status === 'Ready') &&
+    yamlPlan.status !== 'Pending' &&
+    yamlPlan.status !== 'Ready'
+  ) {
+    enriched.status = yamlPlan.status;
+  }
+
   // Enrich VMs
   for (const [vmId, yamlVM] of Object.entries(yamlPlan.vms)) {
     const logVM = enriched.vms[vmId];
