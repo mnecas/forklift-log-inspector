@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { VM, RawLogEntry } from '../types';
 import { formatTimestamp } from '../utils/dateUtils';
 import { getLevelBadgeClass, getPhaseBadgeClass } from '../utils/badgeUtils';
@@ -71,7 +71,7 @@ export function VMRawLogsModal({ vm, onClose }: VMRawLogsModalProps) {
     });
   }, [allLogs, filterPhase, filterLevel, searchTerm]);
 
-  const toggleExpanded = (idx: number) => {
+  const toggleExpanded = useCallback((idx: number) => {
     setExpandedLogs(prev => {
       const next = new Set(prev);
       if (next.has(idx)) {
@@ -81,7 +81,7 @@ export function VMRawLogsModal({ vm, onClose }: VMRawLogsModalProps) {
       }
       return next;
     });
-  };
+  }, []);
 
   const footerContent = (
     <div className="flex justify-between items-center">

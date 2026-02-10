@@ -3,6 +3,7 @@ import type { Plan } from '../types';
 import { useStore, useSearchQuery } from '../store/useStore';
 import { VMCard } from './VMCard';
 import { ErrorSection } from './ErrorSection';
+import { SchedulerView } from './SchedulerView';
 import { getStatusBadgeClass } from '../utils/badgeUtils';
 import { formatDateLocale } from '../utils/dateUtils';
 import { SearchHighlight } from './common';
@@ -180,6 +181,11 @@ export function PlanCard({ plan }: PlanCardProps) {
                 })}
               </div>
             </div>
+          )}
+
+          {/* Scheduler View */}
+          {plan.scheduleHistory && plan.scheduleHistory.length > 0 && (
+            <SchedulerView scheduleHistory={plan.scheduleHistory} />
           )}
 
           {/* Errors and Panics */}

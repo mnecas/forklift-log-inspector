@@ -192,6 +192,7 @@ export interface Plan {
   firstSeen: Date;
   lastSeen: Date;
   spec?: PlanSpec;
+  scheduleHistory?: ScheduleSnapshot[];
 }
 
 export interface Event {
@@ -227,6 +228,14 @@ export interface ParsedData {
   events: Event[];
   summary: Summary;
   stats: ParseStats;
+}
+
+// Scheduler snapshot for tracking in-flight and pending VMs
+export interface ScheduleSnapshot {
+  timestamp: string;
+  inflight: Record<string, { id?: string; name?: string }[]>;
+  pending: Record<string, { id?: string; name?: string }[]>;
+  nextVM?: { id?: string; name?: string };
 }
 
 // Log entry as parsed from JSON

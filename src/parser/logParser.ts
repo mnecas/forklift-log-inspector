@@ -1,4 +1,4 @@
-import type { LogEntry, Plan, ParsedData } from '../types';
+import type { LogEntry, Plan, ParsedData, ScheduleSnapshot } from '../types';
 import { LogStore } from './LogStore';
 import { ContainerLogPrefixRegex } from './constants';
 import { parseTimestamp, isPanicLine } from './utils';
@@ -111,32 +111,48 @@ function processEntry(store: LogStore, entry: LogEntry): void {
     return;
   }
 
-  // Check for migration logs
-  if (entry.logger?.startsWith('migration|')) {
-    processMigrationLog(store, entry, ts);
-    return;
-  }
-
-  // Check for migrator logs
-  if (entry.logger === 'migrator') {
-    processMigratorLog(store, entry, ts);
+  // Check for scheduler logs (snapshot of inflight/pending VMs)
+  if (entry.msg?.includes('scheduler') || entry.logger?.includes('scheduler')) {
+    processSchedulerLog(store, entry, ts);
     return;
   }
 }
 
 /**
- * Process migration controller logs
+ * Process scheduler log entries to capture scheduling snapshots
  */
-function processMigrationLog(_store: LogStore, _entry: LogEntry, _ts: Date): void {
-  // Migration logs don't contain as much useful info as plan logs
-  // but we could track them if needed
-}
+function processSchedulerLog(store: LogStore, entry: LogEntry, ts: Date): void {
+  // Look for structured scheduler data in the log entry
+  const entryAny = entry as unknown as Record<string, unknown>;
+  const inflight = entryAny.inflight as Record<string, { id?: string; name?: string }[]> | undefined;
+  const pending = entryAny.pending as Record<string, { id?: string; name?: string }[]> | undefined;
 
-/**
- * Process migrator logs
- */
-function processMigratorLog(_store: LogStore, _entry: LogEntry, _ts: Date): void {
-  // Can track migrator build events if needed
+  if (!inflight && !pending) return;
+
+  const snapshot: ScheduleSnapshot = {
+    timestamp: ts.toISOString(),
+    inflight: inflight || {},
+    pending: pending || {},
+  };
+
+  // Check for next VM info
+  const nextVM = entryAny.next as { id?: string; name?: string } | undefined;
+  if (nextVM) {
+    snapshot.nextVM = nextVM;
+  }
+
+  // Try to associate with a plan from the logger (e.g., "scheduler|ns/plan")
+  const loggerParts = entry.logger?.split('|');
+  if (loggerParts && loggerParts.length >= 2) {
+    const planRef = loggerParts[1];
+    const plan = store.findPlan(planRef);
+    if (plan) {
+      if (!plan.scheduleHistory) {
+        plan.scheduleHistory = [];
+      }
+      plan.scheduleHistory.push(snapshot);
+    }
+  }
 }
 
 export { LogStore };

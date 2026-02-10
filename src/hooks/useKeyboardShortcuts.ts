@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface KeyboardShortcut {
   key: string;
@@ -10,39 +10,43 @@ interface KeyboardShortcut {
 }
 
 /**
- * Hook for managing keyboard shortcuts
+ * Hook for managing keyboard shortcuts.
+ * Uses a ref to avoid re-attaching the event listener when the shortcuts array changes.
  */
 export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[], enabled: boolean = true) {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in inputs
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      // Allow Escape key even in inputs
-      if (e.key !== 'Escape') {
-        return;
-      }
-    }
-
-    for (const shortcut of shortcuts) {
-      const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase();
-      const ctrlMatch = shortcut.ctrl ? (e.ctrlKey || e.metaKey) : !(e.ctrlKey || e.metaKey);
-      const shiftMatch = shortcut.shift ? e.shiftKey : !e.shiftKey;
-      const altMatch = shortcut.alt ? e.altKey : !e.altKey;
-
-      if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
-        e.preventDefault();
-        shortcut.action();
-        return;
-      }
-    }
-  }, [shortcuts]);
+  const shortcutsRef = useRef(shortcuts);
+  shortcutsRef.current = shortcuts;
 
   useEffect(() => {
     if (!enabled) return;
-    
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        // Allow Escape key even in inputs
+        if (e.key !== 'Escape') {
+          return;
+        }
+      }
+
+      for (const shortcut of shortcutsRef.current) {
+        const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase();
+        const ctrlMatch = shortcut.ctrl ? (e.ctrlKey || e.metaKey) : !(e.ctrlKey || e.metaKey);
+        const shiftMatch = shortcut.shift ? e.shiftKey : !e.shiftKey;
+        const altMatch = shortcut.alt ? e.altKey : !e.altKey;
+
+        if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
+          e.preventDefault();
+          shortcut.action();
+          return;
+        }
+      }
+    };
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown, enabled]);
+  }, [enabled]);
 }
 
 /**

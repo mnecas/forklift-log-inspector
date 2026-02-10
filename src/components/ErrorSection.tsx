@@ -11,14 +11,14 @@ interface ErrorSectionProps {
 export function ErrorSection({ errors, panics }: ErrorSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  if (errors.length === 0 && panics.length === 0) {
-    return null;
-  }
-
-  // Count errors vs warnings for display
+  // Count errors vs warnings for display (hooks must be called before early returns)
   const errorCount = useMemo(() => errors.filter(e => e.level === 'error').length, [errors]);
   const warningCount = useMemo(() => errors.filter(e => e.level !== 'error').length, [errors]);
   const totalCount = errors.length + panics.length;
+
+  if (errors.length === 0 && panics.length === 0) {
+    return null;
+  }
 
   return (
     <div className="space-y-2">

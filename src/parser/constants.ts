@@ -269,3 +269,62 @@ export const ContainerLogPrefixRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:
 
 // VM regex pattern
 export const VMRegex = /id:(vm-\d+)\s+name:'([^']+)'/;
+
+// Short display names for phases
+export const PhaseShortNames: Record<string, string> = {
+  'Started': 'Start',
+  'PreHook': 'PreHook',
+  'StorePowerState': 'StorePwr',
+  'PowerOffSource': 'PwrOff',
+  'WaitForPowerOff': 'WaitPwr',
+  'CreateDataVolumes': 'CreateDV',
+  'CreateSnapshot': 'CreateSnap',
+  'WaitForSnapshot': 'WaitSnap',
+  'StoreSnapshot': 'StoreSnap',
+  'AddCheckpoint': 'AddChkpt',
+  'AddFinalCheckpoint': 'FinalChkpt',
+  'CreateInitialSnapshot': 'InitSnap',
+  'WaitForInitialSnapshot': 'WaitInit',
+  'StoreInitialSnapshotDeltas': 'StoreDeltas',
+  'Preflight': 'Preflight',
+  'PreflightInspection': 'Preflight',
+  'CreateVM': 'CreateVM',
+  'Initialize': 'Init',
+  'DiskTransfer': 'DiskTransfer',
+  'DiskTransferV2v': 'DiskV2V',
+  'DiskAllocation': 'DiskAlloc',
+  'Cutover': 'Cutover',
+  'ImageConversion': 'ImgConv',
+  'VirtualMachineCreation': 'CreateVM',
+  'CopyDisks': 'Copy',
+  'CopyDisksVirtV2V': 'CopyV2V',
+  'CreateGuestConversionPod': 'ConvPod',
+  'ConvertGuest': 'Convert',
+  'CopyingPaused': 'Paused',
+  'AllocateDisks': 'Allocate',
+  'WaitForDataVolumes': 'WaitDV',
+  'RemovePenultimateSnapshot': 'RmPenSnap',
+  'WaitForPenultimateSnapshotRemoval': 'WaitRmPen',
+  'RemoveFinalSnapshot': 'RmFinalSnap',
+  'WaitForFinalSnapshotRemoval': 'WaitRmFinal',
+  'Finalize': 'Finalize',
+  'FinalSnapshot': 'FinalSnap',
+  'WaitForFinalSnapshot': 'WaitFinal',
+  'WaitForFinalDataVolumes': 'WaitFinalDV',
+  'RemovePreviousSnapshot': 'RmPrevSnap',
+  'WaitForPreviousSnapshotRemoval': 'WaitRmPrev',
+  'PostHook': 'PostHook',
+  'Completed': 'Done',
+  'Canceled': 'Cancel',
+  'StoreSnapshotDeltas': 'StoreDeltas',
+  'WaitForDataVolumesStatus': 'WaitDVStatus',
+  'CreateFinalSnapshot': 'FinalSnap',
+  'ConvertOpenstackSnapshot': 'ConvOSSnap',
+};
+
+/**
+ * Get a shortened version of the phase name for display
+ */
+export function getShortPhaseName(phase: string): string {
+  return PhaseShortNames[phase] || phase.replace(/([a-z])([A-Z])/g, '$1\u200B$2').slice(0, 10);
+}

@@ -10,6 +10,7 @@ export { PhaseLogsModal } from './PhaseLogsModal';
 export { ErrorSection } from './ErrorSection';
 export { PlansGrid } from './PlansGrid';
 export { VMRawLogsModal } from './VMRawLogsModal';
-
+export { SchedulerView } from './SchedulerView';
+export { EventTimeline } from './EventTimeline';
 // Common components
 export * from './common';

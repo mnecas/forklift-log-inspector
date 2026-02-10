@@ -61,6 +61,7 @@ export function SearchFilter() {
             />
           </svg>
           <input
+            id="global-search-input"
             type="text"
             placeholder="Search plans, VMs, namespaces..."
             value={searchQuery}
@@ -98,6 +99,7 @@ export function SearchFilter() {
             </button>
           ))}
         </div>
+
       </div>
     </div>
   );

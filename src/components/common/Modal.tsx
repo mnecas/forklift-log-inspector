@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -45,6 +45,8 @@ export function Modal({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (!isOpen) return;
@@ -53,6 +55,45 @@ export function Modal({
     return () => {
       document.body.style.overflow = '';
     };
+  }, [isOpen]);
+
+  // Focus trap: keep focus within the modal while it's open
+  useEffect(() => {
+    if (!isOpen || !dialogRef.current) return;
+
+    const dialog = dialogRef.current;
+    const focusableSelector = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      const focusableElements = dialog.querySelectorAll<HTMLElement>(focusableSelector);
+      if (focusableElements.length === 0) return;
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    // Focus first focusable element on open
+    const focusableElements = dialog.querySelectorAll<HTMLElement>(focusableSelector);
+    if (focusableElements.length > 0) {
+      focusableElements[0].focus();
+    }
+
+    document.addEventListener('keydown', handleTab);
+    return () => document.removeEventListener('keydown', handleTab);
   }, [isOpen]);
 
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
@@ -67,15 +108,19 @@ export function Modal({
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
     >
       <div 
+        ref={dialogRef}
         className={`bg-white dark:bg-slate-800 rounded-xl ${maxWidthClasses[maxWidth]} w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between flex-shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">
+            <h2 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-gray-100">
               {title}
             </h2>
             {subtitle && (
@@ -86,6 +131,7 @@ export function Modal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-500 dark:text-gray-400"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

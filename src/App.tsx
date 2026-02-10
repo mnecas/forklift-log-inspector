@@ -1,11 +1,12 @@
 import { useEffect, useCallback } from 'react';
-import { useStore, useShowKeyboardHelp } from './store/useStore';
+import { useStore, useShowKeyboardHelp, useEvents } from './store/useStore';
 import { ToastProvider } from './components/Toast';
 import { Header } from './components/Header';
 import { UploadZone } from './components/UploadZone';
 import { StatsBar } from './components/StatsBar';
 import { SearchFilter } from './components/SearchFilter';
 import { PlansGrid } from './components/PlansGrid';
+import { EventTimeline } from './components/EventTimeline';
 import { Modal } from './components/common';
 import { useKeyboardShortcuts, KEYBOARD_SHORTCUTS } from './hooks';
 
@@ -40,6 +41,7 @@ function KeyboardShortcutsHelp() {
 
 function AppContent() {
   const { theme, plans, devMode, initializeTheme, toggleTheme, toggleDevMode, navigatePlan, toggleSelectedPlanExpanded, setShowKeyboardHelp, setSearchQuery } = useStore();
+  const events = useEvents();
 
   // Initialize theme from system preference on first load
   useEffect(() => {
@@ -82,8 +84,7 @@ function AppContent() {
 
   // Focus search handler
   const handleFocusSearch = useCallback(() => {
-    // Try to focus the search input in SearchFilter
-    const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+    const searchInput = document.getElementById('global-search-input') as HTMLInputElement;
     if (searchInput) {
       searchInput.focus();
       searchInput.select();
@@ -93,7 +94,7 @@ function AppContent() {
   // Clear search handler
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
-    const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+    const searchInput = document.getElementById('global-search-input') as HTMLInputElement;
     if (searchInput && document.activeElement === searchInput) {
       searchInput.blur();
     }
@@ -125,6 +126,7 @@ function AppContent() {
           </>
         )}
         
+        {events.length > 0 && <EventTimeline events={events} />}
         <PlansGrid />
       </main>
 

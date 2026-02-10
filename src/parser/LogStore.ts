@@ -65,6 +65,13 @@ export class LogStore {
   }
 
   /**
+   * Find a plan by key (namespace/name)
+   */
+  findPlan(key: string): Plan | undefined {
+    return this.plans.get(key);
+  }
+
+  /**
    * Get the most recent plan (by lastSeen)
    */
   getMostRecentPlan(): Plan | undefined {

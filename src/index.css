@@ -205,10 +205,6 @@ body {
   background: #64748b;
 }
 
-.dark .scrollbar-visible::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
 /* Animations */
 @keyframes slideIn {
   from {
