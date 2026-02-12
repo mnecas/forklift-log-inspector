@@ -231,6 +231,7 @@ export interface V2VComponentVersions {
   vddk?: string;
   libguestfs?: string;
   qemu?: string;
+  virtioWin?: string;
 }
 
 /** Per-disk storage info */

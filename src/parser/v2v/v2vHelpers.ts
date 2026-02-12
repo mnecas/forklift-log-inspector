@@ -96,6 +96,8 @@ export const VERSION_QEMU_RE = /libguestfs:\s*qemu version[^:]*:\s*([\d.]+)/;
 /** libguestfs: trace: v2v: version = <struct guestfs_version = major: 1, minor: 56, release: 1 */
 export const VERSION_LIBGUESTFS_RE =
   /libguestfs: trace: \w+: version = <struct guestfs_version = major: (\d+), minor: (\d+), release: (\d+)/;
+/** virtio-win version from ISO path: virtio-win-1.9.46.iso */
+export const VERSION_VIRTIO_WIN_RE = /virtio-win-([\d.]+)\.iso/;
 
 // ── Line categorization / noise filtering ────────────────────────────────────
 
@@ -149,6 +151,7 @@ export const VERSION_MATCHERS: { key: keyof V2VComponentVersions; re: RegExp; fm
   { key: 'vddk', re: VERSION_VDDK_RE },
   { key: 'qemu', re: VERSION_QEMU_RE },
   { key: 'libguestfs', re: VERSION_LIBGUESTFS_RE, fmt: (m) => `${m[1]}.${m[2]}.${m[3]}` },
+  { key: 'virtioWin', re: VERSION_VIRTIO_WIN_RE },
 ];
 
 // ── Helper functions ────────────────────────────────────────────────────────

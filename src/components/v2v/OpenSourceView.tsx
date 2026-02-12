@@ -387,31 +387,34 @@ function BootTimelineSection({ events }: { events: BootEvent[] }) {
         {events.map((evt, idx) => (
           <div key={idx} className="flex items-start gap-2 text-[11px]">
             {/* Timeline dot + line */}
-            <div className="flex flex-col items-center pt-1">
+            <div className="flex flex-col items-center pt-1.5">
               <div className="w-1.5 h-1.5 rounded-full bg-blue-400 dark:bg-blue-500 flex-shrink-0" />
               {idx < events.length - 1 && (
                 <div className="w-px h-3 bg-blue-200 dark:bg-blue-800" />
               )}
             </div>
 
-            {/* Timestamp */}
-            {evt.timestamp && (
-              <span className="text-[10px] font-mono text-slate-400 dark:text-gray-500 min-w-[45px] text-right">
-                [{evt.timestamp}s]
-              </span>
-            )}
+            {/* Text content — baseline-aligned */}
+            <div className="flex items-baseline gap-2 min-w-0">
+              {/* Timestamp */}
+              {evt.timestamp && (
+                <span className="text-[10px] font-mono text-slate-400 dark:text-gray-500 min-w-[45px] text-right flex-shrink-0">
+                  [{evt.timestamp}s]
+                </span>
+              )}
 
-            {/* Label */}
-            <span className="font-medium text-slate-700 dark:text-gray-200">
-              {evt.label}
-            </span>
-
-            {/* Detail */}
-            {evt.detail && (
-              <span className="text-slate-500 dark:text-gray-400 font-mono text-[10px] truncate max-w-[300px]">
-                {evt.detail}
+              {/* Label */}
+              <span className="font-medium text-slate-700 dark:text-gray-200">
+                {evt.label}
               </span>
-            )}
+
+              {/* Detail */}
+              {evt.detail && (
+                <span className="text-slate-500 dark:text-gray-400 font-mono text-[10px] truncate max-w-[300px]">
+                  {evt.detail}
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>
