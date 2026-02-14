@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -25,9 +25,10 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const nextId = useRef(0);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Date.now();
+    const id = nextId.current++;
     setToasts((prev) => [...prev, { id, message, type }]);
   }, []);
 
@@ -38,7 +39,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-auto">
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
         ))}
@@ -97,11 +98,12 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
       {icons[toast.type]}
       <span className="flex-1">{toast.message}</span>
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           onRemove(toast.id);
         }}
-        className="p-1 rounded hover:bg-white/20 transition-colors"
+        className="flex-shrink-0 p-1.5 rounded hover:bg-white/20 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
