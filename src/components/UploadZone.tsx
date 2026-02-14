@@ -391,10 +391,13 @@ export function UploadZone() {
               Drop your files here, or click to browse
             </p>
             <p className="text-slate-500 dark:text-gray-400 text-sm">
-              Upload forklift logs, virt-v2v/inspector logs, Plan YAMLs, and archives
+              Upload forklift logs, virt-v2v logs, Plan YAMLs, or must-gather archives
             </p>
-            <p className="text-slate-500 dark:text-gray-400 text-xs mt-1">
-              .log, .logs, .txt, .json, .yaml, .yml, .log.gz, .tar, .tar.gz, .tgz, .zip
+            <p className="text-slate-400 dark:text-gray-500 text-xs mt-3 flex items-center justify-center gap-1.5">
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Your files never leave your browser — all processing happens locally on your device.
             </p>
           </>
         )}
