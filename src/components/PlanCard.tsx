@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { Plan } from '../types';
-import { useStore, useSearchQuery, useDevMode } from '../store/useStore';
+import type { Plan, NetworkMapResource, StorageMapResource } from '../types';
+import { useStore, useSearchQuery, useDevMode, useNetworkMaps, useStorageMaps } from '../store/useStore';
 import { VMCard } from './VMCard';
 import { ErrorSection } from './ErrorSection';
 import { SchedulerView } from './SchedulerView';
@@ -36,10 +36,33 @@ export function PlanCard({ plan }: PlanCardProps) {
   const { togglePlanExpanded, isPlanExpanded } = useStore();
   const searchQuery = useSearchQuery();
   const devMode = useDevMode();
+  const networkMaps = useNetworkMaps();
+  const storageMaps = useStorageMaps();
   const planKey = `${plan.namespace}/${plan.name}`;
   const isExpanded = isPlanExpanded(planKey);
 
   const vms = useMemo(() => Object.values(plan.vms), [plan.vms]);
+
+  const networkMapName = plan.spec?.networkMap;
+  const storageMapName = plan.spec?.storageMap;
+
+  const networkMap = useMemo(() => {
+    if (networkMapName) {
+      const found = networkMaps.find(m => m.name === networkMapName && m.namespace === plan.namespace);
+      if (found) return found;
+    }
+    // Fallback: match by ownerPlanName
+    return networkMaps.find(m => m.ownerPlanName === plan.name && m.namespace === plan.namespace);
+  }, [networkMaps, networkMapName, plan.name, plan.namespace]);
+
+  const storageMap = useMemo(() => {
+    if (storageMapName) {
+      const found = storageMaps.find(m => m.name === storageMapName && m.namespace === plan.namespace);
+      if (found) return found;
+    }
+    // Fallback: match by ownerPlanName
+    return storageMaps.find(m => m.ownerPlanName === plan.name && m.namespace === plan.namespace);
+  }, [storageMaps, storageMapName, plan.name, plan.namespace]);
 
   const statusBadgeClass = getStatusBadgeClass(plan.status);
   const dataSource = devMode ? getDataSourceLabel(plan) : '';
@@ -186,12 +209,6 @@ export function PlanCard({ plan }: PlanCardProps) {
                 {plan.spec.destinationProvider && (
                   <SpecPill label="Destination" value={plan.spec.destinationProvider} />
                 )}
-                {plan.spec.networkMap && (
-                  <SpecPill label="Network Map" value={plan.spec.networkMap} />
-                )}
-                {plan.spec.storageMap && (
-                  <SpecPill label="Storage Map" value={plan.spec.storageMap} />
-                )}
                 {plan.spec.transferNetwork && (
                   <SpecPill label="Transfer Network" value={plan.spec.transferNetwork} />
                 )}
@@ -208,6 +225,17 @@ export function PlanCard({ plan }: PlanCardProps) {
                 <BoolPill label="Delete VM on Failure" value={plan.spec.deleteVmOnFailMigration} />
                 <BoolPill label="Legacy Drivers" value={plan.spec.installLegacyDrivers} />
               </div>
+              <MapSection label="Network Map" kind="network" mapResource={networkMap} fallbackName={plan.spec.networkMap} />
+              <MapSection label="Storage Map" kind="storage" mapResource={storageMap} fallbackName={plan.spec.storageMap} />
+            </div>
+          )}
+
+          {/* Maps (shown even for log-derived plans via ownerPlanName matching) */}
+          {(networkMap || storageMap) && !plan.spec && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-500 dark:text-gray-400">Resource Maps</h4>
+              <MapSection label="Network Map" kind="network" mapResource={networkMap} fallbackName={undefined} />
+              <MapSection label="Storage Map" kind="storage" mapResource={storageMap} fallbackName={undefined} />
             </div>
           )}
 
@@ -294,5 +322,80 @@ function BoolPill({ label, value }: { label: string; value?: boolean }) {
       <span className={`w-1.5 h-1.5 rounded-full ${value ? 'bg-green-500' : 'bg-slate-400 dark:bg-gray-500'}`} />
       {label}
     </span>
+  );
+}
+
+function MapSection({
+  label,
+  kind,
+  mapResource,
+  fallbackName
+}: {
+  label: string;
+  kind: 'network' | 'storage';
+  mapResource?: NetworkMapResource | StorageMapResource;
+  fallbackName?: string;
+}) {
+  if (!mapResource && !fallbackName) return null;
+
+  if (!mapResource) {
+    return <SpecPill label={label} value={fallbackName!} />;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="text-xs font-medium text-slate-500 dark:text-gray-400">{label}: {mapResource.name}</div>
+      <div className="space-y-1">
+        {mapResource.entries.map((entry, idx) => {
+          // Resolve source name from references if available
+          const resolvedSourceName = kind === 'network'
+            ? (mapResource as NetworkMapResource).references?.find(r => r.id === entry.source.id)?.name
+            : undefined;
+          const sourceName = resolvedSourceName || entry.source.name || entry.source.id || 'unknown';
+
+          // Build destination label
+          let destLabel: string;
+          if (kind === 'network') {
+            const dest = entry.destination as { type?: string; name?: string; namespace?: string };
+            destLabel = dest.type === 'pod'
+              ? 'Pod Network'
+              : `${dest.name || ''}${dest.type ? ` (${dest.type})` : ''}`;
+          } else {
+            const dest = entry.destination as { storageClass?: string; name?: string };
+            destLabel = dest.storageClass || dest.name || 'default';
+          }
+
+          return (
+            <div key={idx} className="flex items-center gap-2 text-xs">
+              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-gray-300 truncate max-w-[200px]" title={sourceName}>
+                {sourceName}
+              </span>
+              <svg className="w-3 h-3 text-slate-400 dark:text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+              <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 truncate max-w-[200px]" title={destLabel}>
+                {destLabel}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {/* Show conditions if any are not Ready */}
+      {mapResource.conditions.length > 0 && mapResource.conditions.some(c => !(c.type === 'Ready' && c.status === 'True')) && (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {mapResource.conditions.map((cond, idx) => {
+            let colorClass = 'bg-slate-100 dark:bg-gray-500/20 text-slate-600 dark:text-gray-400';
+            if (cond.status === 'True' && cond.type === 'Failed') {
+              colorClass = 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400';
+            }
+            return (
+              <span key={idx} className={`px-2 py-0.5 rounded text-xs ${colorClass}`} title={cond.message}>
+                {cond.type}: {cond.status}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

@@ -29,6 +29,21 @@ export function mergeResults(
   return mergeBoth(a, b);
 }
 
+// ── Deduplication ─────────────────────────────────────────────────────────
+
+function deduplicateMaps<T extends { name: string; namespace: string }>(a: T[], b: T[]): T[] {
+  const seen = new Set(a.map(m => `${m.namespace}/${m.name}`));
+  const result = [...a];
+  for (const item of b) {
+    const key = `${item.namespace}/${item.name}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 // ── Merge logic ────────────────────────────────────────────────────────────
 
 function mergeBoth(dataA: ParsedData, dataB: ParsedData): ParsedData {
@@ -80,7 +95,11 @@ function mergeBoth(dataA: ParsedData, dataB: ParsedData): ParsedData {
 
   const summary = computeSummary(mergedPlans);
 
-  return { plans: mergedPlans, events, stats, summary };
+  // Combine network and storage maps (deduplicated by namespace/name)
+  const networkMaps = deduplicateMaps(dataA.networkMaps || [], dataB.networkMaps || []);
+  const storageMaps = deduplicateMaps(dataA.storageMaps || [], dataB.storageMaps || []);
+
+  return { plans: mergedPlans, events, stats, summary, networkMaps, storageMaps };
 }
 
 // ── Plan merging ───────────────────────────────────────────────────────────
@@ -246,5 +265,7 @@ function emptyResult(): ParsedData {
       archived: 0,
       pending: 0,
     },
+    networkMaps: [],
+    storageMaps: [],
   };
 }

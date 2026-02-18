@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { useStore, useShowKeyboardHelp, useEvents, useViewMode } from './store/useStore';
+import { useStore, useShowKeyboardHelp, useEvents, useViewMode, useNetworkMaps, useStorageMaps } from './store/useStore';
 import { useV2VStore } from './store/useV2VStore';
 import { ToastProvider } from './components/Toast';
 import { Header } from './components/Header';
@@ -46,6 +46,8 @@ function AppContent() {
   const events = useEvents();
   const hasV2VData = useV2VStore((s) => s.v2vFileEntries.length > 0);
   const viewMode = useViewMode();
+  const networkMaps = useNetworkMaps();
+  const storageMaps = useStorageMaps();
 
   // Initialize theme from system preference on first load
   useEffect(() => {
@@ -126,7 +128,7 @@ function AppContent() {
         {/* V2V analysis view — shown when user navigates to it */}
         {viewMode === 'v2v' && hasV2VData ? (
           <V2VDashboard />
-        ) : plans.length > 0 || events.length > 0 ? (
+        ) : plans.length > 0 || events.length > 0 || networkMaps.length > 0 || storageMaps.length > 0 ? (
           <>
             {plans.length > 0 && (
               <>

@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import type { Plan, PlanSpec, VM, VMError, PhaseInfo, Condition, ParsedData, ParseStats, Summary, PhaseLogSummary, RawLogEntry, MigrationType, WarmInfo, PrecopyInfo } from '../types';
+import type { Plan, PlanSpec, VM, VMError, PhaseInfo, Condition, ParsedData, ParseStats, Summary, PhaseLogSummary, RawLogEntry, MigrationType, WarmInfo, PrecopyInfo, NetworkMapResource, StorageMapResource, NetworkMapEntry, StorageMapEntry, MapReference } from '../types';
 import { PlanStatuses, MigrationTypes, PipelineSteps, Phases, ConditionStatus, phaseToStep } from './constants';
 import { formatDuration, groupLogs } from './utils';
 
@@ -131,6 +131,30 @@ interface YamlKubernetesList {
   metadata?: unknown;
 }
 
+interface YamlMapResource {
+  apiVersion?: string;
+  kind?: string;
+  metadata?: {
+    name?: string;
+    namespace?: string;
+    ownerReferences?: Array<{ kind?: string; name?: string }>;
+  };
+  spec?: {
+    map?: Array<{
+      source?: { id?: string; name?: string };
+      destination?: { type?: string; name?: string; namespace?: string; storageClass?: string; accessMode?: string; volumeMode?: string };
+    }>;
+    provider?: {
+      source?: { name?: string; namespace?: string };
+      destination?: { name?: string; namespace?: string };
+    };
+  };
+  status?: {
+    conditions?: YamlCondition[];
+    references?: Array<{ id?: string; name?: string }>;
+  };
+}
+
 /**
  * Check if content looks like YAML (not JSON log lines)
  */
@@ -169,6 +193,8 @@ export function parsePlanYaml(content: string): ParsedData {
         archived: 0,
         pending: 0,
       },
+      networkMaps: [],
+      storageMaps: [],
     };
   }
 }
@@ -177,6 +203,8 @@ function parsePlanYamlImpl(content: string): ParsedData {
   const docs = yaml.loadAll(content) as unknown[];
 
   const planResources: YamlPlanResource[] = [];
+  const networkMapResources: YamlMapResource[] = [];
+  const storageMapResources: YamlMapResource[] = [];
 
   for (const doc of docs) {
     if (!doc || typeof doc !== 'object') continue;
@@ -194,12 +222,42 @@ function parsePlanYamlImpl(content: string): ParsedData {
       continue;
     }
 
+    if (obj.kind === 'NetworkMapList') {
+      const list = doc as { items?: YamlMapResource[] };
+      if (list.items && Array.isArray(list.items)) {
+        for (const item of list.items) {
+          if (isNetworkMapResource(item)) {
+            networkMapResources.push(item as YamlMapResource);
+          }
+        }
+      }
+      continue;
+    }
+
+    if (obj.kind === 'StorageMapList') {
+      const list = doc as { items?: YamlMapResource[] };
+      if (list.items && Array.isArray(list.items)) {
+        for (const item of list.items) {
+          if (isStorageMapResource(item)) {
+            storageMapResources.push(item as YamlMapResource);
+          }
+        }
+      }
+      continue;
+    }
+
     if (isPlanResource(doc)) {
       planResources.push(doc as YamlPlanResource);
+    } else if (isNetworkMapResource(doc)) {
+      networkMapResources.push(doc as YamlMapResource);
+    } else if (isStorageMapResource(doc)) {
+      storageMapResources.push(doc as YamlMapResource);
     }
   }
 
   const plans: Plan[] = planResources.map(convertPlanResource);
+  const networkMaps: NetworkMapResource[] = networkMapResources.map(convertNetworkMapResource);
+  const storageMaps: StorageMapResource[] = storageMapResources.map(convertStorageMapResource);
 
   const stats: ParseStats = {
     totalLines: content.split('\n').length,
@@ -219,7 +277,7 @@ function parsePlanYamlImpl(content: string): ParsedData {
     pending: plans.filter(p => p.status === PlanStatuses.Pending || p.status === PlanStatuses.Ready).length,
   };
 
-  return { plans, events: [], summary, stats };
+  return { plans, events: [], summary, stats, networkMaps, storageMaps };
 }
 
 function isPlanResource(obj: unknown): boolean {
@@ -227,6 +285,86 @@ function isPlanResource(obj: unknown): boolean {
   const o = obj as Record<string, unknown>;
   return o.kind === 'Plan' && typeof o.apiVersion === 'string' &&
     (o.apiVersion as string).startsWith('forklift.konveyor.io/');
+}
+
+function isNetworkMapResource(obj: unknown): boolean {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return o.kind === 'NetworkMap' && typeof o.apiVersion === 'string' &&
+    (o.apiVersion as string).startsWith('forklift.konveyor.io/');
+}
+
+function isStorageMapResource(obj: unknown): boolean {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return o.kind === 'StorageMap' && typeof o.apiVersion === 'string' &&
+    (o.apiVersion as string).startsWith('forklift.konveyor.io/');
+}
+
+function convertNetworkMapResource(resource: YamlMapResource): NetworkMapResource {
+  const name = resource.metadata?.name || 'unknown';
+  const namespace = resource.metadata?.namespace || 'default';
+
+  const ownerPlanName = resource.metadata?.ownerReferences
+    ?.find(ref => ref.kind === 'Plan')?.name;
+
+  const entries: NetworkMapEntry[] = (resource.spec?.map || []).map(entry => ({
+    source: { id: entry.source?.id, name: entry.source?.name },
+    destination: { type: entry.destination?.type, name: entry.destination?.name, namespace: entry.destination?.namespace },
+  }));
+
+  const provider = resource.spec?.provider ? {
+    source: resource.spec.provider.source ? { name: resource.spec.provider.source.name, namespace: resource.spec.provider.source.namespace } : undefined,
+    destination: resource.spec.provider.destination ? { name: resource.spec.provider.destination.name, namespace: resource.spec.provider.destination.namespace } : undefined,
+  } : undefined;
+
+  const conditions: Condition[] = (resource.status?.conditions || []).map(c => ({
+    type: c.type || '',
+    status: c.status || '',
+    category: c.category,
+    message: c.message || '',
+    timestamp: new Date(c.lastTransitionTime || 0),
+  }));
+
+  const references: MapReference[] | undefined = resource.status?.references?.map(r => ({
+    id: r.id || '',
+    name: r.name || '',
+  }));
+
+  return { name, namespace, ownerPlanName, entries, provider, conditions, references };
+}
+
+function convertStorageMapResource(resource: YamlMapResource): StorageMapResource {
+  const name = resource.metadata?.name || 'unknown';
+  const namespace = resource.metadata?.namespace || 'default';
+
+  const ownerPlanName = resource.metadata?.ownerReferences
+    ?.find(ref => ref.kind === 'Plan')?.name;
+
+  const entries: StorageMapEntry[] = (resource.spec?.map || []).map(entry => ({
+    source: { id: entry.source?.id, name: entry.source?.name },
+    destination: {
+      storageClass: entry.destination?.storageClass,
+      accessMode: entry.destination?.accessMode,
+      volumeMode: entry.destination?.volumeMode,
+      name: entry.destination?.name,
+    },
+  }));
+
+  const provider = resource.spec?.provider ? {
+    source: resource.spec.provider.source ? { name: resource.spec.provider.source.name, namespace: resource.spec.provider.source.namespace } : undefined,
+    destination: resource.spec.provider.destination ? { name: resource.spec.provider.destination.name, namespace: resource.spec.provider.destination.namespace } : undefined,
+  } : undefined;
+
+  const conditions: Condition[] = (resource.status?.conditions || []).map(c => ({
+    type: c.type || '',
+    status: c.status || '',
+    category: c.category,
+    message: c.message || '',
+    timestamp: new Date(c.lastTransitionTime || 0),
+  }));
+
+  return { name, namespace, ownerPlanName, entries, provider, conditions };
 }
 
 function convertPlanResource(resource: YamlPlanResource): Plan {

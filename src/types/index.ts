@@ -227,11 +227,58 @@ export interface Summary {
   pending: number;
 }
 
+export interface NetworkMapEntry {
+  source: { id?: string; name?: string };
+  destination: { type?: string; name?: string; namespace?: string };
+}
+
+export interface StorageMapEntry {
+  source: { id?: string; name?: string };
+  destination: {
+    storageClass?: string;
+    accessMode?: string;
+    volumeMode?: string;
+    name?: string;
+  };
+}
+
+export interface MapReference {
+  id: string;
+  name: string;
+}
+
+export interface NetworkMapResource {
+  name: string;
+  namespace: string;
+  ownerPlanName?: string;
+  entries: NetworkMapEntry[];
+  provider?: {
+    source?: { name?: string; namespace?: string };
+    destination?: { name?: string; namespace?: string };
+  };
+  conditions: Condition[];
+  references?: MapReference[];
+}
+
+export interface StorageMapResource {
+  name: string;
+  namespace: string;
+  ownerPlanName?: string;
+  entries: StorageMapEntry[];
+  provider?: {
+    source?: { name?: string; namespace?: string };
+    destination?: { name?: string; namespace?: string };
+  };
+  conditions: Condition[];
+}
+
 export interface ParsedData {
   plans: Plan[];
   events: Event[];
   summary: Summary;
   stats: ParseStats;
+  networkMaps: NetworkMapResource[];
+  storageMaps: StorageMapResource[];
 }
 
 // Scheduler snapshot for tracking in-flight and pending VMs

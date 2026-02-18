@@ -259,7 +259,7 @@ export function UploadZone() {
         combined = mergeResults(combined, archiveResult);
       }
 
-      if (combined.plans.length === 0 && combined.events.length === 0) {
+      if (combined.plans.length === 0 && combined.events.length === 0 && combined.networkMaps.length === 0 && combined.storageMaps.length === 0) {
         showToast('No forklift data found in the uploaded files', 'error');
         return;
       }
@@ -271,13 +271,21 @@ export function UploadZone() {
       const plainYamlCount = yamlContents.length;
       const totalLogs = plainLogCount + archiveLogCount;
       const totalYamls = plainYamlCount + archiveYamlCount;
+      const totalNetworkMaps = combined.networkMaps.length;
+      const totalStorageMaps = combined.storageMaps.length;
       const parts: string[] = [];
 
       if (totalLogs > 0) {
         parts.push(`${totalLogs} log file${totalLogs !== 1 ? 's' : ''}`);
       }
       if (totalYamls > 0) {
-        parts.push(`${totalYamls} Plan YAML${totalYamls !== 1 ? 's' : ''}`);
+        parts.push(`${totalYamls} YAML${totalYamls !== 1 ? 's' : ''}`);
+      }
+      if (totalNetworkMaps > 0) {
+        parts.push(`${totalNetworkMaps} NetworkMap${totalNetworkMaps !== 1 ? 's' : ''}`);
+      }
+      if (totalStorageMaps > 0) {
+        parts.push(`${totalStorageMaps} StorageMap${totalStorageMaps !== 1 ? 's' : ''}`);
       }
 
       const fileDesc = parts.length > 0

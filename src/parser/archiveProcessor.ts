@@ -70,21 +70,24 @@ function isForkliftLogFile(entry: TarEntry): boolean {
 // V2V_PATH_RE, isV2VLogByPath imported from ./v2v/pathClassifier
 
 /**
- * Patterns that identify Plan Kubernetes resources from forklift.
- * Both `kind: Plan` / `kind:Plan` variants are covered.
+ * Patterns that identify Forklift Kubernetes resources.
+ * Both `kind: Plan` / `kind:Plan` variants are covered, plus NetworkMap and StorageMap.
  */
 const PLAN_KIND_RE = /kind:\s*Plan\b/;
+const NETWORKMAP_KIND_RE = /kind:\s*NetworkMap\b/;
+const STORAGEMAP_KIND_RE = /kind:\s*StorageMap\b/;
 const FORKLIFT_API_RE = /forklift\.konveyor\.io/;
 
 /**
- * Check whether a file contains a Forklift Plan YAML resource.
+ * Check whether a file contains a Forklift YAML resource (Plan, NetworkMap, or StorageMap).
  * Only checks the first CLASSIFY_CHECK_BYTES for large files.
  */
-function isPlanYamlFile(entry: TarEntry): boolean {
+function isForkliftYamlFile(entry: TarEntry): boolean {
   const sample = entry.content.length > CLASSIFY_CHECK_BYTES
     ? entry.content.slice(0, CLASSIFY_CHECK_BYTES)
     : entry.content;
-  return PLAN_KIND_RE.test(sample) && FORKLIFT_API_RE.test(sample);
+  if (!FORKLIFT_API_RE.test(sample)) return false;
+  return PLAN_KIND_RE.test(sample) || NETWORKMAP_KIND_RE.test(sample) || STORAGEMAP_KIND_RE.test(sample);
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -134,7 +137,7 @@ async function processArchiveImpl(
   for (const entry of entries) {
     if (isForkliftLogFile(entry)) {
       logEntries.push(entry);
-    } else if (isPlanYamlFile(entry)) {
+    } else if (isForkliftYamlFile(entry)) {
       yamlEntries.push(entry);
     } else if (
       isV2VLogByPath(entry.path) ||
@@ -157,7 +160,7 @@ async function processArchiveImpl(
   }
 
   if (yamlEntries.length > 0) {
-    onProgress?.('Parsing Plan YAMLs...', `${yamlEntries.length} file${yamlEntries.length !== 1 ? 's' : ''}`);
+    onProgress?.('Parsing Forklift YAMLs...', `${yamlEntries.length} file${yamlEntries.length !== 1 ? 's' : ''}`);
     const combined = yamlEntries.map((e) => e.content).join('\n---\n');
     yamlResult = parsePlanYaml(combined);
   }

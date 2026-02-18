@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Plan, Event, ParseStats, Summary, ParsedData } from '../types';
+import type { Plan, Event, ParseStats, Summary, ParsedData, NetworkMapResource, StorageMapResource } from '../types';
 
 export type ViewMode = 'plans' | 'v2v';
 
@@ -8,6 +8,8 @@ interface AppState {
   // Data
   plans: Plan[];
   events: Event[];
+  networkMaps: NetworkMapResource[];
+  storageMaps: StorageMapResource[];
   stats: ParseStats;
   summary: Summary;
   
@@ -74,6 +76,8 @@ export const useStore = create<AppState>()(
       // Initial data state
       plans: [],
       events: [],
+      networkMaps: [],
+      storageMaps: [],
       stats: initialStats,
       summary: initialSummary,
       
@@ -93,6 +97,8 @@ export const useStore = create<AppState>()(
         set({
           plans: result.plans,
           events: result.events,
+          networkMaps: result.networkMaps,
+          storageMaps: result.storageMaps,
           stats: result.stats,
           summary: result.summary,
           selectedPlanIndex: result.plans.length > 0 ? 0 : -1,
@@ -103,6 +109,8 @@ export const useStore = create<AppState>()(
         set({
           plans: [],
           events: [],
+          networkMaps: [],
+          storageMaps: [],
           stats: initialStats,
           summary: initialSummary,
           expandedPlans: [],
@@ -222,3 +230,5 @@ export const useSelectedPlanIndex = () => useStore((state) => state.selectedPlan
 export const useShowKeyboardHelp = () => useStore((state) => state.showKeyboardHelp);
 export const useDevMode = () => useStore((state) => state.devMode);
 export const useViewMode = () => useStore((state) => state.viewMode);
+export const useNetworkMaps = () => useStore((state) => state.networkMaps);
+export const useStorageMaps = () => useStore((state) => state.storageMaps);

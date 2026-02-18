@@ -39,6 +39,8 @@ function makeParsedData(plans: Plan[], totalLines = 0): ParsedData {
       archived: 0,
       pending: plans.length,
     },
+    networkMaps: [],
+    storageMaps: [],
   };
 }
 

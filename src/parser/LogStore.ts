@@ -243,6 +243,8 @@ export class LogStore {
       events: this.events,
       summary: this.getSummary(),
       stats: this.getStats(),
+      networkMaps: [],
+      storageMaps: [],
     };
   }
 
