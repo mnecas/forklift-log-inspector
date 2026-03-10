@@ -125,7 +125,7 @@ export function UploadZone() {
   const [progressStage, setProgressStage] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setParseResult, clearData } = useStore();
+  const { setParseResult, clearData, setSourceFileName } = useStore();
   const { showToast } = useToast();
 
   /**
@@ -156,6 +156,7 @@ export function UploadZone() {
     try {
       clearData();
       useV2VStore.getState().clearV2VData();
+      setSourceFileName(valid.length === 1 ? valid[0].name : valid[0].name);
 
       // Accumulate all log content and YAML content across all files
       const logContents: string[] = [];
@@ -304,7 +305,7 @@ export function UploadZone() {
       setProgressStage('');
       setProgressDetail('');
     }
-  }, [clearData, setParseResult, showToast]);
+  }, [clearData, setParseResult, setSourceFileName, showToast]);
 
   const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
