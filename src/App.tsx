@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useStore, useShowKeyboardHelp, useEvents, useViewMode, useNetworkMaps, useStorageMaps } from './store/useStore';
 import { useV2VStore } from './store/useV2VStore';
 import { ToastProvider } from './components/Toast';
@@ -11,6 +11,7 @@ import { EventTimeline } from './components/EventTimeline';
 import { V2VDashboard } from './components/v2v';
 import { Modal } from './components/common';
 import { useKeyboardShortcuts, KEYBOARD_SHORTCUTS } from './hooks';
+import { hasEmbeddedData, hydrateFromEmbeddedData } from './utils/embeddedData';
 
 function KeyboardShortcutsHelp() {
   const showKeyboardHelp = useShowKeyboardHelp();
@@ -48,6 +49,14 @@ function AppContent() {
   const viewMode = useViewMode();
   const networkMaps = useNetworkMaps();
   const storageMaps = useStorageMaps();
+  const [isEmbedded] = useState(() => hasEmbeddedData());
+
+  // Hydrate stores from embedded data when opened as an exported HTML file
+  useEffect(() => {
+    if (isEmbedded) {
+      hydrateFromEmbeddedData();
+    }
+  }, [isEmbedded]);
 
   // Initialize theme from system preference on first load
   useEffect(() => {
@@ -123,7 +132,7 @@ function AppContent() {
       <Header />
       
       <main className="flex-1">
-        <UploadZone />
+        {!isEmbedded && <UploadZone />}
         
         {/* V2V analysis view — shown when user navigates to it */}
         {viewMode === 'v2v' && hasV2VData ? (

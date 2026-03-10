@@ -1,5 +1,6 @@
 import { useStore } from '../store/useStore';
 import { useV2VStore } from '../store/useV2VStore';
+import { ExportButton } from './ExportButton';
 
 export function Header() {
   const { theme, toggleTheme, clearData } = useStore();
@@ -30,6 +31,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-3">
+          <ExportButton />
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors text-slate-700 dark:text-gray-100"

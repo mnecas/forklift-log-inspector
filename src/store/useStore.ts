@@ -23,9 +23,11 @@ interface AppState {
   selectedPlanIndex: number;
   showKeyboardHelp: boolean;
   viewMode: ViewMode;
+  sourceFileName: string;
   
   // Actions
   setParseResult: (result: ParsedData) => void;
+  setSourceFileName: (name: string) => void;
   clearData: () => void;
   toggleTheme: () => void;
   setTheme: (theme: 'dark' | 'light') => void;
@@ -91,6 +93,7 @@ export const useStore = create<AppState>()(
       selectedPlanIndex: -1,
       showKeyboardHelp: false,
       viewMode: 'plans',
+      sourceFileName: '',
       
       // Actions
       setParseResult: (result: ParsedData) => {
@@ -105,6 +108,10 @@ export const useStore = create<AppState>()(
         });
       },
       
+      setSourceFileName: (name: string) => {
+        set({ sourceFileName: name });
+      },
+      
       clearData: () => {
         set({
           plans: [],
@@ -116,6 +123,7 @@ export const useStore = create<AppState>()(
           expandedPlans: [],
           selectedPlanIndex: -1,
           viewMode: 'plans',
+          sourceFileName: '',
         });
       },
       
@@ -232,3 +240,4 @@ export const useDevMode = () => useStore((state) => state.devMode);
 export const useViewMode = () => useStore((state) => state.viewMode);
 export const useNetworkMaps = () => useStore((state) => state.networkMaps);
 export const useStorageMaps = () => useStore((state) => state.storageMaps);
+export const useSourceFileName = () => useStore((state) => state.sourceFileName);
