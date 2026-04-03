@@ -152,6 +152,7 @@ export const useV2VStore = create<V2VState>()((set, get) => ({
     set((state) => ({
       highlightedLine: line,
       highlightVersion: state.highlightVersion + 1,
+      componentFilter: line !== null ? 'all' : state.componentFilter,
       expandedPanels: line !== null
         ? { ...state.expandedPanels, rawlog: true }
         : state.expandedPanels,
