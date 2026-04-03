@@ -4,6 +4,7 @@ import type { V2VToolRun, V2VLineCategory } from '../../types/v2v';
 import { highlightSearch } from './shared';
 import { VirtualizedLogViewer, SearchNavControls } from './VirtualizedLogViewer';
 import type { LogSearchMatchInfo } from './VirtualizedLogViewer';
+import { LineLink } from './LineLink';
 
 interface V2VRawLogViewerProps {
   toolRun: V2VToolRun;
@@ -290,10 +291,10 @@ const LogRow = memo(function LogRow({ line, isHighlighted, isSearchMatch, isCurr
     >
       {/* Line number gutter — sticky so it stays visible during horizontal scroll */}
       <div
-        className="px-2 py-0 text-right select-none text-slate-400 dark:text-gray-600 w-[60px] flex-shrink-0 whitespace-nowrap border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 z-10"
+        className="px-2 py-0 text-right select-none w-[60px] flex-shrink-0 whitespace-nowrap border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 z-10"
         style={{ position: 'sticky', left: 0 }}
       >
-        {line.globalLine + 1}
+        <LineLink line={line.globalLine} label={String(line.globalLine + 1)} />
       </div>
       {/* Log text — no truncation, allows horizontal scroll */}
       <div
