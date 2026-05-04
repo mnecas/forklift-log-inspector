@@ -378,11 +378,12 @@ export function handleLibvirtXML(ctx: ParseContext, line: string): void {
 export function handleNbdkit(ctx: ParseContext, line: string, globalLine: number): void {
   const isNbdkitStart =
     line.startsWith('running nbdkit:') || line.startsWith('running nbdkit ');
+  const isNbdkitLine = /^nbdkit(\[[^\]]+\])?:/.test(line);
   if (isNbdkitStart) {
     ctx.currentNbdkit = { startLine: globalLine, logLines: [], filters: [] };
   }
 
-  if (isNbdkitStart || line.startsWith('nbdkit:') || (ctx.currentNbdkit && line.startsWith(' '))) {
+  if (isNbdkitStart || isNbdkitLine || (ctx.currentNbdkit && line.startsWith(' '))) {
     if (ctx.currentNbdkit) {
       ctx.currentNbdkit.logLines = ctx.currentNbdkit.logLines || [];
       ctx.currentNbdkit.logLines.push(line);
@@ -440,13 +441,13 @@ export function handleNbdkit(ctx: ParseContext, line: string, globalLine: number
 
     const cowMatch = line.match(COW_FILE_SIZE_RE);
     if (cowMatch && ctx.currentNbdkit) ctx.currentNbdkit.backingSize = parseInt(cowMatch[1], 10);
-  } else if (ctx.currentNbdkit && !line.startsWith('nbdkit:')) {
+  } else if (ctx.currentNbdkit && !isNbdkitLine) {
     finalizeNbdkit(ctx.currentNbdkit, ctx.nbdkitMap, globalLine);
     ctx.currentNbdkit = null;
   }
 
   // Standalone nbdkit log lines
-  if (line.startsWith('nbdkit:') && !ctx.currentNbdkit) {
+  if (isNbdkitLine && !ctx.currentNbdkit) {
     const lastConn = [...ctx.nbdkitMap.values()].pop();
     if (lastConn) {
       lastConn.logLines.push(line);

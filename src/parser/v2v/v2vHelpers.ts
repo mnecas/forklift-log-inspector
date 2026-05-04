@@ -89,6 +89,9 @@ export const VERSION_VIRTV2V_RE = /^info:\s*(?:virt-v2v[\w-]*):\s*virt-v2v\s+([\
 export const VERSION_LIBVIRT_RE = /^info:\s*libvirt version:\s*([\d.]+)/;
 /** nbdkit 1.38.5 (nbdkit-...) */
 export const VERSION_NBDKIT_RE = /\bnbdkit\s+([\d]+\.[\d]+\.[\d]+)/;
+
+/** nbdkit line prefix: matches nbdkit:, nbdkit[in]:, nbdkit[out]:, nbdkit[in0]:, etc. */
+export const NBDKIT_PREFIX_RE = /^nbdkit(\[[^\]]+\])?:/;
 /** VMware VixDiskLib (7.0.3) Release ... */
 export const VERSION_VDDK_RE = /VMware VixDiskLib \(([\d.]+)\)/;
 /** libguestfs: qemu version: 9.1  or  qemu version (reported by libvirt) = 10000000 */
@@ -159,7 +162,7 @@ export const VERSION_MATCHERS: { key: keyof V2VComponentVersions; re: RegExp; fm
 export function categorizeLine(line: string): V2VLineCategory {
   if (KERNEL_BOOT_RE.test(line)) return 'kernel';
   if (STAGE_RE.test(line)) return 'stage';
-  if (line.startsWith('nbdkit:') || line.startsWith('running nbdkit')) return 'nbdkit';
+  if (NBDKIT_PREFIX_RE.test(line) || line.startsWith('running nbdkit')) return 'nbdkit';
   if (line.startsWith('libguestfs:')) return 'libguestfs';
   if (line.startsWith('guestfsd:')) return 'guestfsd';
   if (line.startsWith('command:') || line.startsWith('commandrvf:') || line.startsWith('chroot:'))
@@ -174,6 +177,8 @@ export function categorizeLine(line: string): V2VLineCategory {
 }
 
 export function isKnownPrefix(line: string): boolean {
+  // nbdkit lines with bracket notation
+  if (NBDKIT_PREFIX_RE.test(line)) return true;
   for (const prefix of KNOWN_PREFIXES) {
     if (line.startsWith(prefix)) return true;
   }
@@ -222,12 +227,12 @@ export function isErrorFalsePositive(line: string): boolean {
     if (fp.test(line)) return true;
   }
   // nbdkit debug lines that mention "error" in VDDK timestamps
-  if (line.startsWith('nbdkit:') && line.includes('debug:')) return true;
+  if (NBDKIT_PREFIX_RE.test(line) && line.includes('debug:')) return true;
   return false;
 }
 
 export function extractSource(line: string): string {
-  if (line.startsWith('nbdkit:')) return 'nbdkit';
+  if (NBDKIT_PREFIX_RE.test(line)) return 'nbdkit';
   if (line.startsWith('libguestfs:')) return 'libguestfs';
   if (line.startsWith('guestfsd:')) return 'guestfsd';
   if (line.startsWith('supermin:')) return 'supermin';
