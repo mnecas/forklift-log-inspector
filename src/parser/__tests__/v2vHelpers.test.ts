@@ -31,6 +31,10 @@ describe('categorizeLine', () => {
   it('categorizes nbdkit lines', () => {
     expect(categorizeLine('nbdkit: vddk: debug: connecting')).toBe('nbdkit');
     expect(categorizeLine('running nbdkit --unix /tmp/sock vddk')).toBe('nbdkit');
+    expect(categorizeLine('nbdkit[in]: debug: nbdkit 1.46.2')).toBe('nbdkit');
+    expect(categorizeLine('nbdkit[out]: debug: registered plugin')).toBe('nbdkit');
+    expect(categorizeLine('nbdkit[in0]: debug: TLS disabled')).toBe('nbdkit');
+    expect(categorizeLine('nbdkit[in1]: debug: service mode')).toBe('nbdkit');
   });
 
   it('categorizes libguestfs lines', () => {
@@ -203,6 +207,12 @@ describe('isErrorFalsePositive', () => {
     expect(isErrorFalsePositive('nbdkit: vddk: debug: error in timestamp')).toBe(
       true,
     );
+    expect(isErrorFalsePositive('nbdkit[in]: debug: error in timestamp')).toBe(
+      true,
+    );
+    expect(isErrorFalsePositive('nbdkit[out0]: debug: error in timestamp')).toBe(
+      true,
+    );
   });
 
   it('returns false for real errors', () => {
@@ -217,6 +227,9 @@ describe('isErrorFalsePositive', () => {
 describe('extractSource', () => {
   it('extracts nbdkit', () => {
     expect(extractSource('nbdkit: debug: msg')).toBe('nbdkit');
+    expect(extractSource('nbdkit[in]: debug: msg')).toBe('nbdkit');
+    expect(extractSource('nbdkit[out]: debug: msg')).toBe('nbdkit');
+    expect(extractSource('nbdkit[in0]: debug: msg')).toBe('nbdkit');
   });
 
   it('extracts libguestfs', () => {
