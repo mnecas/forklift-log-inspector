@@ -203,15 +203,21 @@ describe('isErrorFalsePositive', () => {
     expect(isErrorFalsePositive('error: No error')).toBe(true);
   });
 
-  it('returns true for nbdkit debug lines', () => {
-    expect(isErrorFalsePositive('nbdkit: vddk: debug: error in timestamp')).toBe(
+  it('returns true for nbdkit debug lines with &error_fn function pointers', () => {
+    expect(isErrorFalsePositive('nbdkit: debug: VixDiskLib_InitEx (6, 5, &debug_fn, &error_fn, &error_fn, /home/vddk9.0.0, NULL)')).toBe(
       true,
     );
-    expect(isErrorFalsePositive('nbdkit[in]: debug: error in timestamp')).toBe(
+    expect(isErrorFalsePositive('nbdkit[in]: debug: VDDK call: VixDiskLib_InitEx (6, 5, &debug_fn, &error_fn, &error_fn, NULL)')).toBe(
       true,
     );
-    expect(isErrorFalsePositive('nbdkit[out0]: debug: error in timestamp')).toBe(
-      true,
+  });
+
+  it('returns false for nbdkit debug lines with real VDDK errors', () => {
+    expect(isErrorFalsePositive('nbdkit[in]: vddk[4]: debug: 2026-03-19T14:21:44.688-04:00 error -[122802] Cannot use advanced transport modes')).toBe(
+      false,
+    );
+    expect(isErrorFalsePositive('nbdkit[in]: debug: 2026-03-19T14:22:55.343-04:00 error -[122716] User agent failed to send request')).toBe(
+      false,
     );
   });
 

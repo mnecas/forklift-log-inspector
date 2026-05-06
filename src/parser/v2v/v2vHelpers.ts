@@ -226,8 +226,8 @@ export function isErrorFalsePositive(line: string): boolean {
   for (const fp of ERROR_FALSE_POSITIVES) {
     if (fp.test(line)) return true;
   }
-  // nbdkit debug lines that mention "error" in VDDK timestamps
-  if (NBDKIT_PREFIX_RE.test(line) && line.includes('debug:')) return true;
+  // nbdkit debug lines with &error_fn (VDDK function pointers, not actual errors)
+  if (NBDKIT_PREFIX_RE.test(line) && line.includes('debug:') && /&\w*error\w*_fn/.test(line)) return true;
   return false;
 }
 
