@@ -1,4 +1,4 @@
-import type { LogEntry, Plan, ParsedData, ScheduleSnapshot } from '../types';
+import type { LogEntry, Plan, ParsedData } from '../types';
 import { LogStore } from './LogStore';
 import { ContainerLogPrefixRegex } from './constants';
 import { parseTimestamp, isPanicLine } from './utils';
@@ -112,53 +112,10 @@ function processEntry(store: LogStore, entry: LogEntry): void {
     return;
   }
 
-  // Check if this is a plan-related log
+  // Check if this is a plan-related log (scheduler events are also under plan| logger)
   if (entry.logger?.startsWith('plan|')) {
     processPlanLog(store, entry, ts);
     return;
-  }
-
-  // Check for scheduler logs (snapshot of inflight/pending VMs)
-  if (entry.msg?.includes('scheduler') || entry.logger?.includes('scheduler')) {
-    processSchedulerLog(store, entry, ts);
-    return;
-  }
-}
-
-/**
- * Process scheduler log entries to capture scheduling snapshots
- */
-function processSchedulerLog(store: LogStore, entry: LogEntry, ts: Date): void {
-  // Look for structured scheduler data in the log entry
-  const entryAny = entry as unknown as Record<string, unknown>;
-  const inflight = entryAny.inflight as Record<string, { id?: string; name?: string }[]> | undefined;
-  const pending = entryAny.pending as Record<string, { id?: string; name?: string }[]> | undefined;
-
-  if (!inflight && !pending) return;
-
-  const snapshot: ScheduleSnapshot = {
-    timestamp: ts.toISOString(),
-    inflight: inflight || {},
-    pending: pending || {},
-  };
-
-  // Check for next VM info
-  const nextVM = entryAny.next as { id?: string; name?: string } | undefined;
-  if (nextVM) {
-    snapshot.nextVM = nextVM;
-  }
-
-  // Try to associate with a plan from the logger (e.g., "scheduler|ns/plan")
-  const loggerParts = entry.logger?.split('|');
-  if (loggerParts && loggerParts.length >= 2) {
-    const planRef = loggerParts[1];
-    const plan = store.findPlan(planRef);
-    if (plan) {
-      if (!plan.scheduleHistory) {
-        plan.scheduleHistory = [];
-      }
-      plan.scheduleHistory.push(snapshot);
-    }
   }
 }
 

@@ -284,9 +284,13 @@ export interface ParsedData {
 // Scheduler snapshot for tracking in-flight and pending VMs
 export interface ScheduleSnapshot {
   timestamp: string;
-  inflight: Record<string, { id?: string; name?: string }[]>;
-  pending: Record<string, { id?: string; name?: string }[]>;
-  nextVM?: { id?: string; name?: string };
+  type: 'schedule_built' | 'vm_scheduled' | 'scheduler_full';
+  inflight: Record<string, number>;
+  pending: Record<string, number>;
+  totalInflight: number;
+  totalPending: number;
+  scheduledVM?: { id: string; name: string };
+  migration?: string;
 }
 
 // Result of processing an archive (tar/tar.gz)

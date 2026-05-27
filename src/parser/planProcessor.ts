@@ -1,4 +1,4 @@
-import type { LogEntry, Plan, VM, Condition, RawLogEntry, WarmInfo, PrecopyInfo } from '../types';
+import type { LogEntry, Plan, VM, Condition, RawLogEntry, WarmInfo, PrecopyInfo, ScheduleSnapshot } from '../types';
 import { LogStore } from './LogStore';
 import { PlanStatuses, Phases, ConditionStatus, PrecopyLoopPhasesSet, PrecopyLoopStartPhase, MigrationTypes } from './constants';
 import { getVMInfo, truncate, getStringFromMap } from './utils';
@@ -154,6 +154,22 @@ export function processPlanLog(store: LogStore, entry: LogEntry, ts: Date): void
 
   if (msg.startsWith('Condition deleted')) {
     processConditionDeleted(plan, entry);
+    return;
+  }
+
+  // Check for scheduler events
+  if (msg === 'Schedule built.') {
+    processScheduleBuilt(plan, entry, ts);
+    return;
+  }
+
+  if (msg === 'Next scheduled VM.') {
+    processNextScheduledVM(plan, entry, ts);
+    return;
+  }
+
+  if (msg === 'The scheduler does not have any additional VMs.') {
+    processSchedulerFull(plan, entry, ts);
     return;
   }
 
@@ -713,6 +729,106 @@ export function storeVMLog(plan: Plan, entry: LogEntry): void {
     vm.phaseLogs[phase] = [];
   }
   vm.phaseLogs[phase].push(rawLogEntry);
+}
+
+/**
+ * Normalize inflight data from logs.
+ * Can be a number (count) or an array of VM objects.
+ */
+function normalizeHostCount(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (Array.isArray(value)) return value.length;
+  return 0;
+}
+
+/**
+ * Process "Schedule built." log entries.
+ * These contain inflight and pending counts per host.
+ */
+function processScheduleBuilt(plan: Plan, entry: LogEntry, ts: Date): void {
+  const entryAny = entry as unknown as Record<string, unknown>;
+  const rawInflight = entryAny.inflight as Record<string, unknown> | undefined;
+  const rawPending = entryAny.pending as Record<string, unknown> | undefined;
+
+  const inflight: Record<string, number> = {};
+  const pending: Record<string, number> = {};
+  let totalInflight = 0;
+  let totalPending = 0;
+
+  if (rawInflight) {
+    for (const [host, val] of Object.entries(rawInflight)) {
+      const count = normalizeHostCount(val);
+      inflight[host] = count;
+      totalInflight += count;
+    }
+  }
+
+  if (rawPending) {
+    for (const [host, val] of Object.entries(rawPending)) {
+      const count = normalizeHostCount(val);
+      pending[host] = count;
+      totalPending += count;
+    }
+  }
+
+  const snapshot: ScheduleSnapshot = {
+    timestamp: ts.toISOString(),
+    type: 'schedule_built',
+    inflight,
+    pending,
+    totalInflight,
+    totalPending,
+    migration: entry.migration,
+  };
+
+  if (!plan.scheduleHistory) {
+    plan.scheduleHistory = [];
+  }
+  plan.scheduleHistory.push(snapshot);
+}
+
+/**
+ * Process "Next scheduled VM." log entries.
+ */
+function processNextScheduledVM(plan: Plan, entry: LogEntry, ts: Date): void {
+  const { id: vmID, name: vmName } = getVMInfo(entry);
+  if (!vmID) return;
+
+  const snapshot: ScheduleSnapshot = {
+    timestamp: ts.toISOString(),
+    type: 'vm_scheduled',
+    inflight: {},
+    pending: {},
+    totalInflight: 0,
+    totalPending: 0,
+    scheduledVM: { id: vmID, name: vmName },
+    migration: entry.migration,
+  };
+
+  if (!plan.scheduleHistory) {
+    plan.scheduleHistory = [];
+  }
+  plan.scheduleHistory.push(snapshot);
+}
+
+/**
+ * Process "The scheduler does not have any additional VMs." log entries.
+ */
+function processSchedulerFull(plan: Plan, entry: LogEntry, ts: Date): void {
+  const snapshot: ScheduleSnapshot = {
+    timestamp: ts.toISOString(),
+    type: 'scheduler_full',
+    inflight: {},
+    pending: {},
+    totalInflight: 0,
+    totalPending: 0,
+    migration: entry.migration,
+  };
+
+  if (!plan.scheduleHistory) {
+    plan.scheduleHistory = [];
+  }
+  plan.scheduleHistory.push(snapshot);
 }
 
 /**
